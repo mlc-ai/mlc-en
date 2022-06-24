@@ -33,9 +33,9 @@ First of all, this process does not necessarily involve code generation. For exa
 
 The machine learning compilation process usually comes with the several goals:
 
-**Integration and dependency minimization.** The process of deployment usually involves integration — assembling necessary elements together for the deployment app. For example, if we want to enable an android camera app to classify flowers, we will need to assemble the necessary code that runs the flower classification models, but not necessarily other parts that are not related to the model (e.g. we do not need to include an embedding table lookup code for NLP applications). The ability to assemble and minimize the necessary dependencies is quite important to reduce the overall size and increase the possible number of environments that the app can deploy to.
+**Integration and dependency minimization.** The process of deployment usually involves integration — assembling necessary elements together for the deployment app. For example, if we want to enable an android camera app to classify flowers, we will need to assemble the necessary code that runs the flower classification models, but not necessarily other parts that are not related to the model (e.g. we do not need to include an embedding table lookup code for NLP applications). The ability to assemble and minimize the necessary dependencies is quite important to reduce the overall size and increase the possible number of environments that the app can be deployed to.
 
-**Leveraging hardware native acceleration.** Each deployment environment comes with its own set of native acceleration techniques, many of which are especially development for ML. One goal of the machine learning compilation process is to leverage that hardware's native acceleration. We can do it through building deployment forms that invoke native acceleration libraries or generate code that leverages native instructions such as TensorCore.
+**Leveraging hardware native acceleration.** Each deployment environment comes with its own set of native acceleration techniques, many of which are especially developed for ML. One goal of the machine learning compilation process is to leverage that hardware's native acceleration. We can do it through building deployment forms that invoke native acceleration libraries or generate code that leverages native instructions such as TensorCore.
 
 **Optimization in general.** There are many equivalent ways to run the same model execution. The common theme of MLC is optimization in different forms to transform the model execution in ways that minimize memory usage or improve execution efficiency.
 
@@ -66,7 +66,6 @@ In this particular model, we take a vector by flattening pixels in an input imag
 
 **Tensor functions** The neural network’s “knowledge” is encoded in the weights and the sequence of computations that takes in tensors and output tensors. We call these computations tensor functions. Notably, a tensor function does not need to correspond to a single step of neural network computation. Part of the computation or entire end-to-end computation can also be seen as a tensor function.
 
-
 ![Example MLC Process as Tensor Function Transformations.](../img/mlc-elem-transform.png)
 :label:`fig_mlc_elem_transform`
 
@@ -78,7 +77,7 @@ MLC is a process of transforming something on the left to the right-hand side. I
 
 ### Remark: Abstraction and Implementations
 
-One thing that we might notice is that we use several different ways to represent a tensor function. For example, `linear_relu` is shown can be represented as a compact box in a graph or a loop nest representation.
+One thing that we might notice is that we use several different ways to represent a tensor function. For example, `linear_relu` is shown that it can be represented as a compact box in a graph or a loop nest representation.
 
 ![Abstractions and Implementations.](../img/mlc-abstraction-impl.png)
 :label:`fig_mlc_abstraction_impl`

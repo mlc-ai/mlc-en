@@ -21,4 +21,5 @@ we will populate notes and tutorials here as course progresses.
 :numbered:
 
 chapter_introduction/index
+chapter_tensor_program/index
 ```

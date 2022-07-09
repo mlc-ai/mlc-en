@@ -273,7 +273,7 @@ b, i, j, k = sch.get_loops(Y)
 # Step 3. Organize the loops
 k0, k1 = sch.split(k, ...)
 sch.reorder(...)
-sch.reverse_compute_at(...)
+sch.compute_at/reverse_compute_at(...)
 ...
 
 # Step 4. decompose reduction

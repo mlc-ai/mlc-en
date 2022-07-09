@@ -209,14 +209,14 @@ def lnumpy_mm_relu_v2(A: np.ndarray, B: np.ndarray, C: np.ndarray):
 
 ```python
 @tvm.script.ir_module
-class MyBmmRule:
+class MyBmmRelu:
   @T.prim_func
   def bmm_relu():
     T.func_attr({"global_symbol": "bmm_relu", "tir.noalias": True})
     # TODO
     ...
 
-sch = tvm.tir.Schedule(MyBmmRule)
+sch = tvm.tir.Schedule(MyBmmRelu)
 IPython.display.Code(sch.mod.script(), language="python")
 # Also please validate your result
 ```
@@ -255,7 +255,7 @@ class TargetModule:
 Your task is to transform the original program to the target program.
 
 ```python
-sch = tvm.tir.Schedule(BmmRelu)
+sch = tvm.tir.Schedule(MyBmmRelu)
 # TODO: transformations
 # Hints: you can use
 # `IPython.display.Code(sch.mod.script(), language="python")`
@@ -273,7 +273,7 @@ b, i, j, k = sch.get_loops(Y)
 # Step 3. Organize the loops
 k0, k1 = sch.split(k, ...)
 sch.reorder(...)
-sch.compute_at(...)
+sch.compute_at/reverse_compute_at(...)
 ...
 
 # Step 4. decompose reduction
@@ -301,7 +301,7 @@ print("Pass")
 Finally we can evaluate the performance of the transformed program.
 
 ```python
-before_rt_lib = tvm.build(MyBmmRule, target="llvm")
+before_rt_lib = tvm.build(MyBmmRelu, target="llvm")
 after_rt_lib = tvm.build(sch.mod, target="llvm")
 a_tvm = tvm.nd.array(np.random.rand(16, 128, 128).astype("float32"))
 b_tvm = tvm.nd.array(np.random.rand(16, 128, 128).astype("float32"))

@@ -10,7 +10,7 @@ python3 -m  pip install mlc-ai-nightly -f https://mlc.ai/wheels
 
 ### Prelude
 
-![](../img/tensor_func_linear_rule.png)
+![](../img/tensor_func_linear_relu.png)
 
 To begin today's lecture, let us recap the key principle of the MLC process. Most of the MLC process can be viewed as transformation among tensor functions. The main thing we aim to answer in our following up are:
 - What are the possible abstractions to represent the tensor function.

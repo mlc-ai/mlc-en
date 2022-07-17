@@ -154,13 +154,12 @@ There are also direct correspondence of loop iterations. `T.grid` is a syntactic
 
 ```python
 # TensorIR
+for i, j, k in T.grid(128, 128, 128):
+
+# numpy
 for i in range(128):
     for j in range(128):
         for k in range(128):
-
-# numpy
-for i, j, k in T.grid(128, 128, 128):
-
 ```
 
 #### Computational Block

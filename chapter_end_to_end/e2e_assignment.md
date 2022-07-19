@@ -120,7 +120,8 @@ test_data = torchvision.datasets.FashionMNIST(
 )
 test_loader = torch.utils.data.DataLoader(
     test_data, batch_size=batch_size, shuffle=False)
-test(pytorch_model(), test_loader)
+torch_model = pytorch_model()
+test(torch_model, test_loader)
 
 ```
 
@@ -191,6 +192,7 @@ def check_equivalence(mod, torch_model, test_loader):
             output_from_pytorch = torch_model(data).numpy()
             output_from_relax = rt_mod["main"](tvm.nd.array(data, tvm.cpu())).numpy()
             tvm.testing.assert_allclose(output_from_pytorch, output_from_relax, rtol=1e-4)
+
 ```
 ```python
 def create_model_via_emit_te():
@@ -222,8 +224,6 @@ test_data = torchvision.datasets.FashionMNIST(
 test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
 mod = create_model_via_emit_te()
-torch_model = pytorch_model()
-
 check_equivalence(mod, torch_model, test_loader)
 IPython.display.Code(mod.script(), language="python")
 
@@ -423,7 +423,7 @@ IPython.display.Code(sch.mod.script(), language="python")
 
 Again, we can test the correctness of the transformed IRModule.
 
-```{.python .input n=12}
+```python
 test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False)
 check_equivalence(sch.mod, torch_model, test_loader)
 

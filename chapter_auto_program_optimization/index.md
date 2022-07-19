@@ -572,7 +572,7 @@ Importantly, putting the search result back into the end-to-end flow is just a m
 
 So we again are following the generic MLC process in the figure below. In future lectures, we will introduce more kinds of transformations on primitive functions and computational graph functions. A good MLC process composes these transformations together to form an end deployment form.
 
-![](../img/auto_prog_optim_process_with_optim.png)
+![](../img/mlc_process.png)
 
 ## Summary
 

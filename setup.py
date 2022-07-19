@@ -10,6 +10,7 @@ requirements = [
     'sphinx',
     'torch',
     'torchvision',
+    'torchsummary',
     'xgboost==1.5',
 ]
 

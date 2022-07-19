@@ -11,6 +11,7 @@ requirements = [
     'torch',
     'torchvision',
     'torchsummary',
+    'pytest',
     'xgboost==1.5',
 ]
 

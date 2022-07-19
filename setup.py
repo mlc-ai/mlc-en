@@ -7,7 +7,6 @@ requirements = [
     'matplotlib',
     'requests',
     'pandas',
-    'pickle',
     'sphinx',
     'torch',
     'torchvision',

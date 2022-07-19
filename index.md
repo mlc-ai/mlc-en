@@ -23,4 +23,5 @@ we will populate notes and tutorials here as course progresses.
 chapter_introduction/index
 chapter_tensor_program/index
 chapter_end_to_end/index
+chapter_auto_program_optimization/index
 ```

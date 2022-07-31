@@ -12,6 +12,7 @@ requirements = [
     'torchvision',
     'torchsummary',
     'xgboost==1.5',
+    'tabulate',
 ]
 
 setup(

@@ -25,4 +25,5 @@ chapter_tensor_program/index
 chapter_end_to_end/index
 chapter_auto_program_optimization/index
 chapter_integration/index
+chapter_gpu_acceleration/index
 ```

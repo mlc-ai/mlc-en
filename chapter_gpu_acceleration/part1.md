@@ -1,4 +1,4 @@
-## Prelude
+## Part 1
 
 In the past chapter, we discussed  MLC flows in CPU environments. This chapter will discuss how to bring some of the optimizations onto GPU. We are going to use CUDA terminology. However, the same set of concepts applies to other kinds of GPUs as well.
 

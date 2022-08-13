@@ -1,4 +1,4 @@
-## Prelude
+## Part 2
 
 We discussed building MLC flows for CPU and GPU environments in the past chapters. This chapter focuses on how we build conceptual programming models for specialized hardware backends.
 

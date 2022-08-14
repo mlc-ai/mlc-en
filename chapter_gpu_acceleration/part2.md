@@ -11,7 +11,7 @@ import tvm
 from tvm.ir.module import IRModule
 from tvm.script import tir as T, relax as R
 from tvm import relax
-import NumPy as np
+import numpy as np
 
 # This is needed for deferring annotation parsing in TVMScript
 from __future__ import annotations 
@@ -39,7 +39,7 @@ def accel_tmm_add(C, A, B):
 def accel_dma_copy(reg, dram):
     reg[:] = dram[:]
 
-def lNumPy_tmm(A: np.ndarray, B: np.ndarray, C: np.ndarray):
+def lnumpy_tmm(A: np.ndarray, B: np.ndarray, C: np.ndarray):
     # a special accumulator memory
     C_accumulator = np.empty((16, 16), dtype="float32")
     A_reg = np.empty((16, 16), dtype="float32")
@@ -76,7 +76,7 @@ c_tmm = a_np @ b_np.T
 
 ```{.python .input}
 c_np = np.empty((1024, 1024), dtype="float32")
-lNumPy_tmm(a_np, b_np, c_np)
+lnumpy_tmm(a_np, b_np, c_np)
 np.testing.assert_allclose(c_np, c_tmm, rtol=1e-5)
 ```
 
@@ -135,7 +135,7 @@ c_nd = tvm.nd.empty((1024, 1024), dtype="float32")
 
 lib = tvm.build(MatmulBlockModule, target="llvm")
 lib["main"](a_nd, b_nd, c_nd)
-np.testing.assert_allclose(c_nd.NumPy(), c_tmm, rtol=1e-5)
+np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```
 
 ### Transforming Loops Around Tensorized Block
@@ -320,7 +320,7 @@ c_nd = tvm.nd.empty((1024, 1024), dtype="float32")
 
 lib = tvm.build(sch.mod, target="llvm")
 lib["main"](a_nd, b_nd, c_nd)
-np.testing.assert_allclose(c_nd.NumPy(), c_tmm, rtol=1e-5)
+np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```
 
 ## Discussions

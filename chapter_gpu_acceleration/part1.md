@@ -2,7 +2,17 @@
 
 In the past chapter, we discussed  MLC flows in CPU environments. This chapter will discuss how to bring some of the optimizations onto GPU. We are going to use CUDA terminology. However, the same set of concepts applies to other kinds of GPUs as well.
 
-## Preparations
+### Install packages
+
+For this course, we will use some ongoing development in TVM, which is an open-source machine learning compilation framework. We provide the following command to install a packaged version for MLC course. The particular notebook of **part 1** depends on a CUDA 11 environment.
+
+```bash
+python3 -m pip install mlc-ai-nightly-cu110 -f https://mlc.ai/wheels
+```
+
+**NOTE: Our build system does not have GPU support yet, so part of codes will not be evaluated.**
+
+### Preparations
 
 To begin with, let us import the necessary dependencies.
 
@@ -17,7 +27,7 @@ import numpy as np
 from __future__ import annotations
 ```
 
-## GPU Architecture
+### GPU Architecture
 
 Let us begin by reviewing what a GPU architecture looks like. A typical GPU contains a collection of stream multi-processors, and each multi-processor has many cores. A GPU device is massively parallel and allows us to execute many tasks concurrently.
 
@@ -53,7 +63,7 @@ i0, i1 = sch.split(i, [None, 128])
 sch.mod.show()
 ```
 
-### GPU Thread Blocks
+#### GPU Thread Blocks
 
 Then we bind the iterators to the GPU thread blocks. Each thread is parameterized by two indices -- `threadIdx.x` and `blockIdx.x`. In practice, we can have multiple dimensional thread indices, but we keep them simple as one dimension.
 
@@ -65,7 +75,7 @@ sch.bind(i1, "threadIdx.x")
 sch.mod.show()
 ```
 
-### Build and Run the TensorIR Function on GPU
+#### Build and Run the TensorIR Function on GPU
 
 We can build and test out the resulting function on the GPU.
 
@@ -84,7 +94,7 @@ print(B_nd)
 print(C_nd)
 ```
 
-## Window Sum Example
+### Window Sum Example
 
 Now, let us move forward to another example -- window sum. This program can be viewed as a basic version of "convolution" with a predefined weight `[1,1,1]`. We are taking sliding over the input and add three neighboring values together.
 
@@ -148,7 +158,7 @@ rt_mod = tvm.build(sch.mod, target="cuda")
 print(rt_mod.imported_modules[0].get_source())
 ```
 
-### Build Code for Other GPU Platforms
+#### Build Code for Other GPU Platforms
 
 A MLC process usually support targeting multiple kinds of hardware platforms, we can generate Metal code(which is another kind of GPU programming model) by changing the target parameter.
 
@@ -157,7 +167,7 @@ rt_mod = tvm.build(sch.mod, target="metal")
 print(rt_mod.imported_modules[0].get_source())
 ```
 
-## Matrix Multiplication
+### Matrix Multiplication
 
 Let us now get to something slightly more complicated and try out optimizing matrix multiplication on GPU. We will go over two common techniques for GPU performance optimization.
 
@@ -177,7 +187,7 @@ class MyModuleMatmul:
                 C[vi, vj] = C[vi, vj] + A[vi, vk] * B[vk, vj]
 ```
 
-### Local Blocking
+#### Local Blocking
 
 ![](../img/gpu_local_blocking.png)
 
@@ -233,7 +243,7 @@ evaluator = rt_mod.time_evaluator("main", dev, number=10)
 print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```
 
-## Shared Memory Blocking
+### Shared Memory Blocking
 
 ![](../img/gpu_shared_blocking.png)
 
@@ -297,7 +307,7 @@ evaluator = rt_mod.time_evaluator("main", dev, number=10)
 print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```
 
-## Leveraging Automatic Program Optimization
+### Leveraging Automatic Program Optimization
 
 So far, we have been manually writing transformations to optimize the TensorIR program on GPU. We can leverage the automatic program optimization framework to tune the same program. The following code does that, we only set a small number here, and it can take a few min to finish.
 
@@ -325,7 +335,7 @@ evaluator = rt_mod.time_evaluator("main", dev, number=10)
 print("MetaSchedule: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```
 
-## Summary
+### Summary
 
 This chapter studies another axis of MLC -- how we can transform our program for hardware acceleration. The MLC process helps us to bridge the input models toward different GPU programming models and environments. We will visit more hardware specialization topics in the incoming chapter as well.
 

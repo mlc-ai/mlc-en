@@ -2,7 +2,7 @@
 
 We discussed building MLC flows for CPU and GPU environments in the past chapters. This chapter focuses on how we build conceptual programming models for specialized hardware backends.
 
-## Preparations
+### Preparations
 
 To begin with, let us import the necessary dependencies.
 
@@ -17,7 +17,7 @@ import numpy as np
 from __future__ import annotations 
 ```
 
-## Hardware Specialization Trend
+### Hardware Specialization Trend
 
 ![](../img/hardware_specialization.png)
 
@@ -25,7 +25,7 @@ If we look at the machine learning hardware landscape, one emerging theme recent
 
 The latest accelerators for machine learning introduced specialized units for tensor computing, with instructions for multi-dimensional data copy and matrix/tensor computations.
 
-### Key Elements of Specialized Code
+#### Key Elements of Specialized Code
 
 To help us better understand elements of specialized hardware programming, let us first study the following **low-level NumPy** code. While this code still runs in python, it resembles a set of possible operations that can happen in a specialized hardware backend.
 
@@ -80,7 +80,7 @@ lnumpy_tmm(a_np, b_np, c_np)
 np.testing.assert_allclose(c_np, c_tmm, rtol=1e-5)
 ```
 
-### A Block with Tensorized Computation
+#### A Block with Tensorized Computation
 
 One of our key observations is that the specialized accelerator code is not structured in the unit of scalar computations. Most of the TensorIR code we have run so far contains a block that computes a single element in the output Tensor. Many specialized accelerators run computations over regions of tensors. The block construct in TensorIR helps us to group such relevant computation.
 
@@ -138,7 +138,7 @@ lib["main"](a_nd, b_nd, c_nd)
 np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```
 
-### Transforming Loops Around Tensorized Block
+#### Transforming Loops Around Tensorized Block
 
 One thing that we can do here is to transform the loops surrounding the tensor computation block. These loop transformations can help us to reorganize the surrounding iterations to enable a space of different tensor program variants.
 
@@ -154,7 +154,7 @@ sch.reorder(i0, j, i1, k)
 sch.mod.show()
 ```
 
-### Blockization -- Creating Tensorized Blocks
+#### Blockization -- Creating Tensorized Blocks
 
 In most settings, we start with loops that come with scalar computations. TensorIR provides a primitive call blockization to group subregions of a loop together to form a tensorized computation block.
 
@@ -191,7 +191,7 @@ block_mm = sch.blockize(ii)
 sch.mod.show()
 ```
 
-### Transforming TensorIR to Introduce Special Memory Scope
+#### Transforming TensorIR to Introduce Special Memory Scope
 
 As we noted in the low-level NumPy code, one key element of the low-level TensorIR is the special memory scope used during the acceleration.
 
@@ -212,7 +212,7 @@ sch.mod.show()
 
 Here `global.A_reg` contains two parts. `global` indicates that all threads can globally access the memory, and `A_reg` is a **scope tag** of the memory, which provides opportunities for follow-up compilation to map it to special regions such as registers.
 
-## Tensorization
+### Tensorization
 
 Now we have created a set of blocks that maps to the corresponding stages of computation in the TensorIR. The remaining step is to map some of the tensorized blocks to use a specific implementation that maps to the hardware accelerated instructions. This mapping process is called **tensorization**.
 
@@ -323,7 +323,7 @@ lib["main"](a_nd, b_nd, c_nd)
 np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```
 
-## Discussions
+### Discussions
 
 This section covers a set of key elements of specialized hardware support. One of the key constructs here is the tensorized block and computation alongside tensor subregions. TensorIR also contains additional properties that build on top of the foundational elements:
 
@@ -332,7 +332,7 @@ This section covers a set of key elements of specialized hardware support. One o
 
 We don't have enough time to cover these in one lecture, but we will add optional readings on some of the additional content.
 
-## Summary
+### Summary
 
 - Overall trend of Hardware Specialization toward tensorized computation.
 - TensorIR transformations with tensorized blocks.

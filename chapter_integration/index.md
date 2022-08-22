@@ -192,6 +192,7 @@ C = bb.emit_te(te_matmul, A, B).
 ```
 
 Under the hood, the bb.emit_te does the following things:
+
 - Create an input `te.placeholder` for A and B
 - Run them through `te_matmul` function.
 - Call into `te.create_prim_func` to create a TensorIR function.
@@ -267,6 +268,7 @@ fx_module.graph.print_tabular()
 ### Create Map Function
 
 Let us define the overall high-level translation logic. The main flow is as follows:
+
 - Create a `node_map` that maps `fx.Node` to the corresponding `relax.Var` that represents the translated node in IRModule.
 - Iterate over the nodes in the fx graph in topological order.
 - Compute the mapped output of the node given the mapped inputs.

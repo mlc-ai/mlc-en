@@ -146,6 +146,7 @@ sch.mod.show()
 ```
 
 We can inspect the corresponding low-level code (in CUDA). The generated code contains two parts:
+
 - A host part that calls into the GPU driver
 - A cuda kernel that runs the corresponding computation.
 

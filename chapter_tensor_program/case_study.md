@@ -13,6 +13,7 @@ python3 -m  pip install mlc-ai-nightly -f https://mlc.ai/wheels
 ![](../img/tensor_func_linear_relu.png)
 
 To begin today's lecture, let us recap the key principle of the MLC process. Most of the MLC process can be viewed as transformation among tensor functions. The main thing we aim to answer in our following up are:
+
 - What are the possible abstractions to represent the tensor function.
 - What are possible transformations among the tensor functions.
 
@@ -86,6 +87,7 @@ np.testing.assert_allclose(c_mm_relu, c_np, rtol=1e-5)
 ```
 
 The above example code shows how we can bring an **under the hood** implementation of `mm_relu`. Of course, the code itself will run much slower because of the python interpreter. Nevertheless, the example numpy code contains all the possible elements we will use in real-world implementations of those computations.
+
 - Multi-dimensional buffer (arrays).
 - Loops over array dimensions.
 - Computations statements are executed under the loops.
@@ -198,6 +200,7 @@ The above three lines declare the **key properties** about block axes in the fol
 ```
 
 The three lines contain the following information:
+
 - They define where should vi, vj, vk be bound to (in this case i, j k).
 - They declare the original range that the vi, vj, vk are supposed to be (the `128` in `T.axis.spatial(128, i)`)
 - They declare the properties of the iterators (`spatial`, `reduce`)
@@ -327,6 +330,7 @@ class MyModuleWithTwoFunctions:
 #### Section Checkpoint
 
 So far, we have gone through one example instance of TensorIR program and covered most of the elements, including:
+
 - Buffer declarations in parameters and intermediate temporary memory.
 - For loop iterations.
 - **Block** and block axes properties.
@@ -364,6 +368,7 @@ np.testing.assert_allclose(c_mm_relu, c_np, rtol=1e-5)
 ```
 
 The above code block shows a slightly different variation of `mm_relu`. To see the relation to the original program
+
 - We replace the `j` loop with two loops, `j0` and `j1`.
 - The order of iterations changes slightly
 

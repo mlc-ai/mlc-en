@@ -102,6 +102,7 @@ The above example code shows the high-level array operations to perform the end-
 Again from MLC's pov, we would like to see through the details under the hood of these array computations.
 
 For the purpose of illustrating details under the hood, we will again write examples in low-level numpy:
+
 - We will use a loop instead of array functions when necessary to demonstrate the possible loop computations.
 - When possible, we always explicitly allocate arrays via numpy.empty and pass them around.
 
@@ -244,6 +245,7 @@ Again it is helpful to see the TVMScript code and low-level numpy code side-by-s
 ![](../img/e2e_computational_graph_call_tir.png)
 
 It is usually helpful to use graph to visualize high-level model executions. The above figure is a graph-view of the `main` function:
+
 - Each of the box in the graph corresponds to computation operations.
 - The arrows correspond to the input-output of the intermediate tensors.
 
@@ -299,6 +301,7 @@ def lnumpy_mlp(data, w0, b0, w1, b1):
 We can certainly try a bit :) The above figure is one possible "failed attempt" to fit the `lnumpy_mlp` into a "computational graph-like" form by simply connecting function inputs to the function.
 
 We can find that it lost a few nice properties of the previous computational graphs. Specifically,  a computational graph usually has the following properties
+
 - Every input edge to the box corresponds to the input to the operation.
 - Every outgoing edge corresponds to the output of the operations.
 - Each operation can be reordered arbitrarily up to the topological order of the edges.
@@ -375,6 +378,7 @@ Most of our lectures will only deal with computational graphs (dataflow blocks).
 ### Section Checkpoint
 
 So far, we have gone through one example instance of relax program and covered most of the elements, including:
+
 - Computational graph view
 - `call_tir` construct
 - Dataflow block.

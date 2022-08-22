@@ -186,6 +186,7 @@ IPython.display.Code(sch.mod.script(), language="python")
 
 #### Exercise 3: Transform a batch matmul program
 Now, let's go back to the `bmm_relu` exercise. First, Let's see the definition of `bmm`:
+
 - $Y_{n, i, j} = \sum_k A_{n, i, k} \times B_{n, k, j}$
 - $C_{n, i, j} = \mathbb{relu}(Y_{n,i,j}) = \mathbb{max}(Y_{n, i, j}, 0)$
 

@@ -222,7 +222,7 @@ Notably, for a fixed value of vi and vj, the computation block produces a point 
 
 One crucial observation is that the additional information (block axis range and their properties) makes the block to be **self-contained** when it comes to the iterations that it is supposed to carry out independent from the external loop-nest `i`, `j`, `k`.
 
-The block axis information also provides additional properties that help us to validate the correctness of the external loops that are used to carry out the computation. For example, the above code block will result in an error because the loop expects an iterator of size `128`, but we only bound it to a for loop of size `127`.
+The block axis information also provides additional properties that help us to validate the correctness of the external loops that are used to carry out the computation. For example, the code block below will result in an error because the loop expects an iterator of size `128`, but we only bound it to a for loop of size `127`.
 
 
 ```python

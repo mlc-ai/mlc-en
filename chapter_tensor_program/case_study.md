@@ -384,7 +384,7 @@ IPython.display.Code(MyModule.script(), language="python")
 Now we are ready to try out the code transformations, we begin by creating a `Schedule` helper class with the given MyModule as input.
 
 ```{.python .input n=11}
-sch = tvm.tir.Schedule(MyModule)
+sch = tvm.tir.Schedule(MyModuleWithAxisRemapSugar)
 ```
 
 Then we perform the following operations to obtain a reference to block Y and corresponding loops.

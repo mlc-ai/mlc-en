@@ -21,8 +21,6 @@ from tvm.ir.module import IRModule
 from tvm.script import tir as T, relax as R
 import numpy as np
 from tvm import relax
-# This is needed for deferring annotation parsing in TVMScript
-from __future__ import annotations
 import IPython
 ```
 
@@ -173,63 +171,48 @@ With the low-level NumPy example in mind, now we are ready to introduce an MLC a
 @tvm.script.ir_module
 class MyModule:
     @T.prim_func
-    def relu0(X: T.Buffer[(1, 128), "float32"],
-              Y: T.Buffer[(1, 128), "float32"]):
-        # function attr dict
-        T.func_attr({"global_symbol": "relu0", "tir.noalias": True})
-        for i, j in T.grid(1, 128):
+    def relu0(x: T.handle, y: T.handle):
+        n = T.int64()
+        X = T.match_buffer(x, (1, n), "float32")
+        Y = T.match_buffer(y, (1, n), "float32")
+        for i, j in T.grid(1, n):
             with T.block("Y"):
                 vi, vj = T.axis.remap("SS", [i, j])
                 Y[vi, vj] = T.max(X[vi, vj], T.float32(0))
 
     @T.prim_func
-    def linear0(X: T.Buffer[(1, 784), "float32"],
-                W: T.Buffer[(128, 784), "float32"],
-                B: T.Buffer[(128,), "float32"],
-                Z: T.Buffer[(1, 128), "float32"]):
-        T.func_attr({"global_symbol": "linear0", "tir.noalias": True})
-        Y = T.alloc_buffer((1, 128), "float32")
-        for i, j, k in T.grid(1, 128, 784):
+    def linear0(x: T.handle,
+                w: T.handle,
+                b: T.handle,
+                z: T.handle):
+        m, n, k = T.int64(), T.int64(), T.int64()
+        X = T.match_buffer(x, (1, m), "float32")
+        W = T.match_buffer(w, (n, m), "float32")
+        B = T.match_buffer(b, (n, ), "float32")
+        Z = T.match_buffer(z, (1, n), "float32")
+        Y = T.alloc_buffer((1, n), "float32")
+        for i, j, k in T.grid(1, n, m):
             with T.block("Y"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     Y[vi, vj] = T.float32(0)
                 Y[vi, vj] = Y[vi, vj] + X[vi, vk] * W[vj, vk]
-
-        for i, j in T.grid(1, 128):
-            with T.block("Z"):
-                vi, vj = T.axis.remap("SS", [i, j])
-                Z[vi, vj] =  Y[vi, vj] + B[vj]
-
-    @T.prim_func
-    def linear1(X: T.Buffer[(1, 128), "float32"],
-                W: T.Buffer[(10, 128), "float32"],
-                B: T.Buffer[(10,), "float32"],
-                Z: T.Buffer[(1, 10), "float32"]):
-        T.func_attr({"global_symbol": "linear1", "tir.noalias": True})
-        Y = T.alloc_buffer((1, 10), "float32")
-        for i, j, k in T.grid(1, 10, 128):
-            with T.block("Y"):
-                vi, vj, vk = T.axis.remap("SSR", [i, j, k])
-                with T.init():
-                    Y[vi, vj] = T.float32(0)
-                Y[vi, vj] = Y[vi, vj] + X[vi, vk] * W[vj, vk]
-
-        for i, j in T.grid(1, 10):
+        for i, j in T.grid(1, n):
             with T.block("Z"):
                 vi, vj = T.axis.remap("SS", [i, j])
                 Z[vi, vj] = Y[vi, vj] + B[vj]
 
     @R.function
-    def main(x: Tensor((1, 784), "float32"),
-             w0: Tensor((128, 784), "float32"),
-             b0: Tensor((128,), "float32"),
-             w1: Tensor((10, 128), "float32"),
-             b1: Tensor((10,), "float32")):
+    def main(x: R.Tensor((1, "m"), "float32"),
+             w0: R.Tensor(("n", "m"), "float32"),
+             b0: R.Tensor(("n", ), "float32"),
+             w1: R.Tensor(("k", "n"), "float32"),
+             b1: R.Tensor(("k", ), "float32")):
+        m, n, k = T.int64(), T.int64(), T.int64()
         with R.dataflow():
-            lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
-            lv1 = R.call_tir(relu0, (lv0,), (1, 128), dtype="float32")
-            out = R.call_tir(linear1, (lv1, w1, b1), (1, 10), dtype="float32")
+            lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, n), "float32"))
+            lv1 = R.call_dps_packed("relu0", (lv0, ), R.Tensor((1, n), "float32"))
+            out = R.call_dps_packed("linear0", (lv1, w1, b1), R.Tensor((1, k), "float32"))
             R.output(out)
         return out
 ```
@@ -252,28 +235,28 @@ It is usually helpful to use graph to visualize high-level model executions. The
 We have seen this kind of visualization in earlier lectures. The graph itself can be viewed as a type of abstraction, and it is commonly known as  **computational graph** in machine learning frameworks.
 
 
-### `call_tir` Construct
+### `call_dps_packed` Construct
 
-One thing that you may have noticed is that each step of operations in the computational graph contains an `R.call_tir` operation. This is the operation that brings in the tensor primitive functions
+One thing that you may have noticed is that each step of operations in the computational graph contains an `R.call_dps_packed` operation. This is the operation that brings in the tensor primitive functions
 
 ```python
-lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
+lv0 = R.call_dps_packed(linear0, (x, w0, b0), (1, 128), dtype="float32")
 ```
 
-To explain what does `R.call_tir` mean, let us review an equivalent low-level numpy implementation of the operation, as follows:
+To explain what does `R.call_dps_packed` mean, let us review an equivalent low-level numpy implementation of the operation, as follows:
 
 ```{.python .input n=8}
-def lnumpy_call_tir(prim_func, inputs, shape, dtype):
+def lnumpy_call_dps_packed(prim_func, inputs, shape, dtype):
     res = np.empty(shape, dtype=dtype)
     prim_func(*inputs, res)
     return res
 ```
 
-Specifically, call_tir takes in a primitive function (`prim_func`) a list of inputs. Then what it does is allocate an output tensor `res`, then pass the inputs and the output to the `prim_func`. After executing `prim_func` the result is populated in `res`, then we can return the result.
+Specifically, call_dps_packed takes in a primitive function (`prim_func`) a list of inputs. Then what it does is allocate an output tensor `res`, then pass the inputs and the output to the `prim_func`. After executing `prim_func` the result is populated in `res`, then we can return the result.
 
-Note that `lnumpy_call_tir` is only a reference implementation to show the meaning of `R.call_tir`. In practice, there can be different low-level ways to optimize the execution. For example, we might choose to allocate all the output memories ahead of time and then run the execution, which we will cover in future lectures.
+Note that `lnumpy_call_dps_packed` is only a reference implementation to show the meaning of `R.call_dps_packed`. In practice, there can be different low-level ways to optimize the execution. For example, we might choose to allocate all the output memories ahead of time and then run the execution, which we will cover in future lectures.
 
-A natural question that one could ask is why do we need `call_tir` construct? This is because our primitive tensor functions take the following calling convention.
+A natural question that one could ask is why do we need `call_dps_packed` construct? This is because our primitive tensor functions take the following calling convention.
 
 ```python
 def low_level_prim_func(in0, in1, ..., out):
@@ -308,22 +291,22 @@ We can find that it lost a few nice properties of the previous computational gra
 
 Of course, we can still generalize the graph definition by introducing the input edge and output edge, and that can complicate the possible transformations associated with the abstraction.
 
-So coming back to `call_tir`, the key insight here is that we want to hide possible allocation or explicit writing to the functions. In a more formal term, we want the function to be **pure** or **side-effect free**.
+So coming back to `call_dps_packed`, the key insight here is that we want to hide possible allocation or explicit writing to the functions. In a more formal term, we want the function to be **pure** or **side-effect free**.
 
 A function is **pure** or **side-effect free** if: it only reads from its inputs and returns the result via its output, it will not change other parts of the program (such as incrementing a global counter).
 
-**call_tir** is a way for us to hide these details of calling into low-level primitive functions and expose them into a computational graph.
+**call_dps_packed** is a way for us to hide these details of calling into low-level primitive functions and expose them into a computational graph.
 
-We can also see `call_tir` in action in the low-level numpy as well. Now we have defined the `lnumpy_call_tir`, we can rewrite the low-level numpy execution code as:
+We can also see `call_dps_packed` in action in the low-level numpy as well. Now we have defined the `lnumpy_call_dps_packed`, we can rewrite the low-level numpy execution code as:
 
 ```{.python .input n=9}
-def lnumpy_mlp_with_call_tir(data, w0, b0, w1, b1):
-    lv0 = lnumpy_call_tir(lnumpy_linear0, (data, w0, b0), (1, 128), dtype="float32")
-    lv1 = lnumpy_call_tir(lnumpy_relu0, (lv0, ), (1, 128), dtype="float32")
-    out = lnumpy_call_tir(lnumpy_linear1, (lv1, w1, b1), (1, 10), dtype="float32")
+def lnumpy_mlp_with_call_dps_packed(data, w0, b0, w1, b1):
+    lv0 = lnumpy_call_dps_packed(lnumpy_linear0, (data, w0, b0), (1, 128), dtype="float32")
+    lv1 = lnumpy_call_dps_packed(lnumpy_relu0, (lv0, ), (1, 128), dtype="float32")
+    out = lnumpy_call_dps_packed(lnumpy_linear1, (lv1, w1, b1), (1, 10), dtype="float32")
     return out
 
-result = lnumpy_mlp_with_call_tir(
+result = lnumpy_mlp_with_call_dps_packed(
     img.reshape(1, 784),
     mlp_params["w0"],
     mlp_params["b0"],
@@ -334,7 +317,7 @@ pred_kind = np.argmax(result, axis=1)
 print("Low-level Numpy with CallTIR Prediction:", class_names[pred_kind[0]])
 ```
 
-In practice, the lowest-level implementation will have explicit memory allocations, so `call_tir` mainly serves as a purpose for us to continue to do some high-level transformations before we generate the actual implementation.
+In practice, the lowest-level implementation will have explicit memory allocations, so `call_dps_packed` mainly serves as a purpose for us to continue to do some high-level transformations before we generate the actual implementation.
 
 ### Dataflow Block
 
@@ -342,9 +325,9 @@ Another important element in a relax function is the `R.dataflow()` scope annota
 
 ```python
 with R.dataflow():
-    lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
-    lv1 = R.call_tir(relu0, (lv0,), (1, 128), dtype="float32")
-    out = R.call_tir(linear1, (lv1, w1, b1), (1, 10), dtype="float32")
+    lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, n), "float32"))
+    lv1 = R.call_dps_packed("relu0", (lv0, ), R.Tensor((1, n), "float32"))
+    out = R.call_dps_packed("linear0", (lv1, w1, b1), R.Tensor((1, k), "float32"))
     R.output(out)
 ```
 
@@ -354,21 +337,20 @@ What if we still want to introduce operations that contains side effect? A dataf
 
 ```python
 @R.function
-def main(x: Tensor((1, 784), "float32"),
-         w0: Tensor((128, 784), "float32"),
-         b0: Tensor((128,), "float32"),
-         w1: Tensor((10, 128), "float32"),
-         b1: Tensor((10,), "float32")):
+def main(x: R.Tensor((1, "m"), "float32"),
+        w0: R.Tensor(("n", "m"), "float32"),
+        b0: R.Tensor(("n", ), "float32"),
+        w1: R.Tensor(("k", "n"), "float32"),
+        b1: R.Tensor(("k", ), "float32")):
+    m, n, k = T.int64(), T.int64(), T.int64()
 
     with R.dataflow():
-        lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
-        gv0 = R.call_tir(relu0, (lv0,), (1, 128), dtype="float32")
+        lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, n), "float32"))
+        gv0 = R.call_dps_packed("relu0", (lv0, ), R.Tensor((1, n), "float32"))
         R.output(gv0)
 
-    gv1 = R.alloc_tensor((1, 128), dtype="float32")
-
     with R.dataflow():
-        out = R.call_tir(linear1, (gv0, gv1, b0), (1, 128), dtype="float32")
+        out = R.call_dps_packed("linear0", (gv0, w1, b1), R.Tensor((1, k), "float32"))
         R.output(out)
     return out
 ```
@@ -380,7 +362,7 @@ Most of our lectures will only deal with computational graphs (dataflow blocks).
 So far, we have gone through one example instance of relax program and covered most of the elements, including:
 
 - Computational graph view
-- `call_tir` construct
+- `call_dps_packed` construct
 - Dataflow block.
 
 These elements should get us started in the end to end model execution and compilation. we will also cover new concepts as we encounter them in later chapters.
@@ -396,7 +378,7 @@ IPython.display.Code(MyModule.script(), language="python")
 We call `relax.vm.build` to build this function. Relax is still under development, so some of the APIs may change. Our main goal, though, is to get familiar with the overall MLC flow (Construct, transform, build) for end-to-end models.
 
 ```{.python .input n=11}
-ex = relax.vm.build(MyModule, target="llvm")
+ex = relax.build(MyModule, target="llvm")
 type(ex)
 ```
 
@@ -410,7 +392,7 @@ Now we are ready to run the model. We begin by constructing tvm NDArray that con
 
 ```{.python .input n=13}
 data_nd = tvm.nd.array(img.reshape(1, 784))
-nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}
+nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}}
 ```
 
 Then we can run the main function by passing in the input arguments and weights.
@@ -441,24 +423,25 @@ The IRModule shows an example on how to do that.
 @tvm.script.ir_module
 class MyModuleWithExternCall:
     @R.function
-    def main(x: Tensor((1, 784), "float32"),
-             w0: Tensor((128, 784), "float32"),
-             b0: Tensor((128,), "float32"),
-             w1: Tensor((10, 128), "float32"),
-             b1: Tensor((10,), "float32")):
+    def main(x: R.Tensor((1, "m"), "float32"),
+             w0: R.Tensor(("n", "m"), "float32"),
+             b0: R.Tensor(("n", ), "float32"),
+             w1: R.Tensor(("k", "n"), "float32"),
+             b1: R.Tensor(("k", ), "float32")):
         # block 0
+        m, n, k = T.int64(), T.int64(), T.int64()
         with R.dataflow():
-            lv0 = R.call_tir("env.linear", (x, w0, b0), (1, 128), dtype="float32")
-            lv1 = R.call_tir("env.relu", (lv0,), (1, 128), dtype="float32")
-            out = R.call_tir("env.linear", (lv1, w1, b1), (1, 10), dtype="float32")
+            lv0 = R.call_dps_packed("env.linear", (x, w0, b0), R.Tensor((1, n), "float32"))
+            lv1 = R.call_dps_packed("env.relu", (lv0, ), R.Tensor((1, n), "float32"))
+            out = R.call_dps_packed("env.linear", (lv1, w1, b1), R.Tensor((1, k), "float32"))
             R.output(out)
         return out
 ```
 
-Note that we now directly pass in strings in `call_tir`
+Note that we now directly pass in strings in `call_dps_packed`
 
 ```python
-R.call_tir("env.linear", (x, w0, b0), (1, 128), dtype="float32")
+R.call_dps_packed("env.linear", (x, w0, b0), R.Tensor((1, n), "float32"))
 ```
 
 These strings are names of runtime functions that we expect to exist during model execution.
@@ -499,7 +482,7 @@ This particular example performs the registration in python. In reality, we can 
 Now we can build and run `MyModuleWithExternCall`, and we can verify that we get the same result.
 
 ```{.python .input n=18}
-ex = relax.vm.build(MyModuleWithExternCall, target="llvm")
+ex = relax.build(MyModuleWithExternCall, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd,
@@ -520,34 +503,38 @@ In the last example, we build an IRModule where all primitive operations are dis
 @tvm.script.ir_module
 class MyModuleMixture:
     @T.prim_func
-    def linear0(X: T.Buffer[(1, 784), "float32"],
-                W: T.Buffer[(128, 784), "float32"],
-                B: T.Buffer[(128,), "float32"],
-                Z: T.Buffer[(1, 128), "float32"]):
-        T.func_attr({"global_symbol": "linear0", "tir.noalias": True})
-        Y = T.alloc_buffer((1, 128), "float32")
-        for i, j, k in T.grid(1, 128, 784):
+    def linear0(x: T.handle,
+                w: T.handle,
+                b: T.handle,
+                z: T.handle):
+        m, n, k = T.int64(), T.int64(), T.int64()
+        X = T.match_buffer(x, (1, m), "float32")
+        W = T.match_buffer(w, (n, m), "float32")
+        B = T.match_buffer(b, (n, ), "float32")
+        Z = T.match_buffer(z, (1, n), "float32")
+        Y = T.alloc_buffer((1, n), "float32")
+        for i, j, k in T.grid(1, n, m):
             with T.block("Y"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     Y[vi, vj] = T.float32(0)
                 Y[vi, vj] = Y[vi, vj] + X[vi, vk] * W[vj, vk]
-
-        for i, j in T.grid(1, 128):
+        for i, j in T.grid(1, n):
             with T.block("Z"):
                 vi, vj = T.axis.remap("SS", [i, j])
-                Z[vi, vj] =  Y[vi, vj] + B[vj]
+                Z[vi, vj] = Y[vi, vj] + B[vj]
 
     @R.function
-    def main(x: Tensor((1, 784), "float32"),
-             w0: Tensor((128, 784), "float32"),
-             b0: Tensor((128,), "float32"),
-             w1: Tensor((10, 128), "float32"),
-             b1: Tensor((10,), "float32")):
+    def main(x: R.Tensor((1, "m"), "float32"),
+             w0: R.Tensor(("n", "m"), "float32"),
+             b0: R.Tensor(("n", ), "float32"),
+             w1: R.Tensor(("k", "n"), "float32"),
+             b1: R.Tensor(("k", ), "float32")):
+        m, n, k = T.int64(), T.int64(), T.int64()
         with R.dataflow():
-            lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
-            lv1 = R.call_tir("env.relu", (lv0,), (1, 128), dtype="float32")
-            out = R.call_tir("env.linear", (lv1, w1, b1), (1, 10), dtype="float32")
+            lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, n), "float32"))
+            lv1 = R.call_dps_packed("env.relu", (lv0, ), R.Tensor((1, n), "float32"))
+            out = R.call_dps_packed("env.linear", (lv1, w1, b1), R.Tensor((1, k), "float32"))
             R.output(out)
         return out
 ```
@@ -555,7 +542,7 @@ class MyModuleMixture:
 The above code block shows an example where linear0 is still implemented in TensorIR, while the rest of the functions are redirected to library functions. We can build and run to validate the result.
 
 ```{.python .input n=20}
-ex = relax.vm.build(MyModuleMixture, target="llvm")
+ex = relax.build(MyModuleMixture, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd,
@@ -580,7 +567,7 @@ IPython.display.Code(MyModuleWithParams.script(), language="python")
 In the above script, `meta[relay.Constant][0]` corresponds to an implicit dictionary that stores the constant (which is not shown as part of the script but still is part of the IRModule). If we build the transformed IRModule, we can now invoke the function by just passing in the input data.
 
 ```{.python .input n=22}
-ex = relax.vm.build(MyModuleWithParams, target="llvm")
+ex = relax.build(MyModuleWithParams, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)
@@ -609,6 +596,6 @@ In this chapter, we construct the IRModule by hand. In practice, a real neural n
 ## Summary
 - Computational graph abstraction helps to stitch primitive tensor functions together for end-to-end execution.
 - Key elements of relax abstraction include
-  - call_tir construct that embeds destination passing style primitive function into the computational graph
+  - call_dps_packed construct that embeds destination passing style primitive function into the computational graph
   - dataflow block
 - Computational graph allows call into both environment library functions and TensorIR functions.

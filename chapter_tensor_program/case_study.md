@@ -98,9 +98,9 @@ With the low-level NumPy example in mind, now we are ready to introduce TensorIR
 @tvm.script.ir_module
 class MyModule:
     @T.prim_func
-    def mm_relu(A: T.Buffer[(128, 128), "float32"],
-                B: T.Buffer[(128, 128), "float32"],
-                C: T.Buffer[(128, 128), "float32"]):
+    def mm_relu(A: T.Buffer((128, 128), "float32"),
+                B: T.Buffer((128, 128), "float32"),
+                C: T.Buffer((128, 128), "float32")):
         T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
         Y = T.alloc_buffer((128, 128), dtype="float32")
         for i, j, k in T.grid(128, 128, 128):
@@ -258,9 +258,9 @@ So we can also write the programs as follows.
 @tvm.script.ir_module
 class MyModuleWithAxisRemapSugar:
     @T.prim_func
-    def mm_relu(A: T.Buffer[(128, 128), "float32"],
-                B: T.Buffer[(128, 128), "float32"],
-                C: T.Buffer[(128, 128), "float32"]):
+    def mm_relu(A: T.Buffer((128, 128), "float32"),
+                B: T.Buffer((128, 128), "float32"),
+                C: T.Buffer((128, 128), "float32")):
         T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
         Y = T.alloc_buffer((128, 128), dtype="float32")
         for i, j, k in T.grid(128, 128, 128):
@@ -306,9 +306,9 @@ Up until now, we have only seen IRModules containing a single tensor function. A
 @tvm.script.ir_module
 class MyModuleWithTwoFunctions:
     @T.prim_func
-    def mm(A: T.Buffer[(128, 128), "float32"],
-           B: T.Buffer[(128, 128), "float32"],
-           Y: T.Buffer[(128, 128), "float32"]):
+    def mm(A: T.Buffer((128, 128), "float32"),
+           B: T.Buffer((128, 128), "float32"),
+           Y: T.Buffer((128, 128), "float32")):
         T.func_attr({"global_symbol": "mm", "tir.noalias": True})
         for i, j, k in T.grid(128, 128, 128):
             with T.block("Y"):
@@ -318,8 +318,8 @@ class MyModuleWithTwoFunctions:
                 Y[vi, vj] = Y[vi, vj] + A[vi, vk] * B[vk, vj]
 
     @T.prim_func
-    def relu(A: T.Buffer[(128, 128), "float32"],
-             B: T.Buffer[(128, 128), "float32"]):
+    def relu(A: T.Buffer((128, 128), "float32"),
+             B: T.Buffer((128, 128), "float32")):
         T.func_attr({"global_symbol": "relu", "tir.noalias": True})
         for i, j in T.grid(128, 128):
             with T.block("B"):

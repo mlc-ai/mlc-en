@@ -12,8 +12,6 @@ To begin with, let us import the necessary dependencies.
 
 ```{.python .input}
 # This is needed for deferring annotation parsing in TVMScript
-from __future__ import annotations
-
 import tvm
 from tvm.ir.module import IRModule
 from tvm.script import tir as T, relax as R
@@ -29,16 +27,16 @@ To begin with, let us start with the following example.
 @tvm.script.ir_module
 class MyModule:
     @R.function
-    def main(x: Tensor((3, 4), "float32"), y: Tensor((3, 4), "float32")):
-        with relax.dataflow():
-            lv0 = relax.multiply(x, y)
-            gv0 = relax.add(lv0, y)
-            relax.output(gv0)
+    def main(x: R.Tensor((3, 4), "float32"), y: R.Tensor((3, 4), "float32")):
+        with R.dataflow():
+            lv0 = relax.op.multiply(x, y)
+            gv0 = relax.op.add(lv0, y)
+            R.output(gv0)
         return gv0
 ```
 
-`MyModule` contains a relax function with two high-level operators, relax.multiply and relax.add. Our goal is to find these two operators and replace it
-with a call into `relax.ewise_fma` operator.
+`MyModule` contains a relax function with two high-level operators, relax.op.multiply and relax.op.add. Our goal is to find these two operators and replace it
+with a call into `relax.op.ewise_fma` operator.
 
 Before we dive into how to do that exactly, let us first examine the data structure that makes up the MyModule. Each IRModule contains a collection of functions, and the function body is composed of a set of data structures called abstract syntax trees (AST).
 
@@ -46,7 +44,7 @@ Before we dive into how to do that exactly, let us first examine the data struct
 relax_func = MyModule["main"]
 ```
 
-Each function is represented by a `relax.Function` node.
+Each function is represented by a `relax.expr.Function` node.
 
 ```{.python .input}
 type(relax_func)
@@ -79,8 +77,8 @@ In our particular case, we have a single data flow block that contains
 two bindings. Each binding corresponds to one of the following two lines
 
 ```python
-lv0 = relax.multiply(x, y)
-gv0 = relax.add(lv0, y)
+lv0 = relax.op.multiply(x, y)
+gv0 = relax.op.add(lv0, y)
 ```
 
 ```{.python .input}
@@ -155,23 +153,22 @@ import pickle as pkl
 mlp_params = pkl.load(open("fasionmnist_mlp_params.pkl", "rb"))
 ```
 
-The following code reconstructs the FashionMNIST MLP model we used in our past chapters. To simplify our explaination, we directly construct the model using high-level operators such as `relax.op.add` and `relax.op.dense`.
+The following code reconstructs the FashionMNIST MLP model we used in our past chapters. To simplify our explaination, we directly construct the model using high-level operators such as `relax.op.add` and `relax.op.matmul`.
 
 ```{.python .input}
 def create_model():
     bb = relax.BlockBuilder()
-    x = relax.Var("x", (1, 784), relax.DynTensorType(2, "float32"))
+    x = relax.Var("x", relax.TensorStructInfo((1, 784), "float32"))
     w0 = relax.const(mlp_params["w0"], "float32")
     b0 = relax.const(mlp_params["b0"], "float32")
     w1 = relax.const(mlp_params["w1"], "float32")
     b1 = relax.const(mlp_params["b1"], "float32")
-
     with bb.function("main", [x]):
         with bb.dataflow():
-            lv0 = bb.emit(relax.op.dense(x, w0))
+            lv0 = bb.emit(relax.op.matmul(x, relax.op.permute_dims(w0)))
             lv1 = bb.emit(relax.op.add(lv0, b0))
-            lv2 = bb.emit(relax.op.relu(lv1))
-            lv3 = bb.emit(relax.op.dense(lv2, w1))
+            lv2 = bb.emit(relax.op.nn.relu(lv1))
+            lv3 = bb.emit(relax.op.matmul(lv2, relax.op.permute_dims(w1)))
             lv4 = bb.emit(relax.op.add(lv3, b1))
             gv = bb.emit_output(lv4)
         bb.emit_func_output(gv)
@@ -184,19 +181,19 @@ MLPModel.show()
 
 We aim to "fuse" the dense and add operations into a single group. The following code achieves that through the following steps:
 
-- Identify `dense` and `add` patterns.
+- Identify `matmul` and `add` patterns.
 - Generate another fused sub-function that calls into the dense and add operators.
-- Replace `dense` and `add` with the fused sub-functions.
+- Replace `matmul` and `add` with the fused sub-functions.
 
 ```{.python .input}
 @relax.expr_functor.mutator
-class DenseAddFusor(relax.PyExprMutator):
+class MatmulAddFusor(relax.PyExprMutator):
     def __init__(self, mod: IRModule) -> None:
         super().__init__()
         self.mod_ = mod
         # cache pre-defined ops
         self.add_op = tvm.ir.Op.get("relax.add")
-        self.dense_op = tvm.ir.Op.get("relax.nn.dense")
+        self.matmul_op = tvm.ir.Op.get("relax.matmul")
         self.counter = 0
 
     def transform(self) -> IRModule:
@@ -204,7 +201,7 @@ class DenseAddFusor(relax.PyExprMutator):
             if not isinstance(func, relax.Function):
                 continue
             # avoid already fused primitive functions
-            if "Primitive" in func.attrs.keys() and func.attrs["Primitive"] != 0:
+            if func.attrs is not None and "Primitive" in func.attrs.keys() and func.attrs["Primitive"] != 0:
                 continue
             updated_func = self.visit_expr(func)
             updated_func = relax.analysis.remove_all_unused(updated_func)
@@ -220,7 +217,7 @@ class DenseAddFusor(relax.PyExprMutator):
                 return False
             return node.op == op
 
-        # pattern match dense => add
+        # pattern match matmul => add
         if not match_call(call, self.add_op):
             return call
 
@@ -228,7 +225,7 @@ class DenseAddFusor(relax.PyExprMutator):
         if value is None:
             return call
 
-        if not match_call(value, self.dense_op):
+        if not match_call(value, self.matmul_op):
             return call
 
         x = value.args[0]
@@ -236,17 +233,17 @@ class DenseAddFusor(relax.PyExprMutator):
         b = call.args[1]
 
         # construct a new fused primitive function
-        param_x = relax.Var("x", x.shape_, x._checked_type_)
-        param_w = relax.Var("w", w.shape_, w._checked_type_)
-        param_b = relax.Var("b", b.shape_, b._checked_type_)
+        param_x = relax.Var("x" ,relax.TensorStructInfo(x.struct_info.shape, x.struct_info.dtype))
+        param_w = relax.Var("w" ,relax.TensorStructInfo(w.struct_info.shape, w.struct_info.dtype))
+        param_b = relax.Var("b" ,relax.TensorStructInfo(b.struct_info.shape, b.struct_info.dtype))
 
         bb = relax.BlockBuilder()
 
-        fn_name = "fused_dense_add%d" % (self.counter)
+        fn_name = "fused_matmul_add%d" % (self.counter)
         self.counter += 1
         with bb.function(fn_name, [param_x, param_w, param_b]):
             with bb.dataflow():
-                lv0 = bb.emit(relax.op.nn.dense(param_x, param_w))
+                lv0 = bb.emit(relax.op.matmul(param_x, param_w))
                 gv = bb.emit_output(relax.op.add(lv0, param_b))
             bb.emit_func_output(gv)
 
@@ -257,11 +254,11 @@ class DenseAddFusor(relax.PyExprMutator):
         # construct call into the fused function
         return relax.Call(global_var, [x, w, b], None, None)
 
-@tvm.ir.transform.module_pass(opt_level=2, name="DeseAddFuse")
+@tvm.ir.transform.module_pass(opt_level=2, name="MatmulAddFuse")
 class FuseDenseAddPass:
     """The wrapper for the LowerTensorIR pass."""
     def transform_module(self, mod, ctx):
-        return DenseAddFusor(mod).transform()
+        return MatmulAddFusor(mod).transform()
 
 
 MLPFused = FuseDenseAddPass()(MLPModel)
@@ -270,7 +267,7 @@ MLPFused.show()
 
 ### Why Creating a Sub-function
 
-In the above example, we created two sub-functions with the prefix `fuse_dense_add`. These sub-function bodies contain information about the operations performed by the fused operator. An alternative to this rewriting is simply creating a separate primitive operation for the fused operator (like `ewise_fma`). However, as we are looking into fusing more operators, there can be an exponential amount of possible combinations. A sub-function that groups the fused operation together provides the same amount of information for follow-up code lowering without introducing a dedicated high-level operator for each fusion pattern.
+In the above example, we created two sub-functions with the prefix `fuse_matmul_add`. These sub-function bodies contain information about the operations performed by the fused operator. An alternative to this rewriting is simply creating a separate primitive operation for the fused operator (like `ewise_fma`). However, as we are looking into fusing more operators, there can be an exponential amount of possible combinations. A sub-function that groups the fused operation together provides the same amount of information for follow-up code lowering without introducing a dedicated high-level operator for each fusion pattern.
 
 ## Map to TensorIR Calls
 
@@ -306,9 +303,9 @@ class LowerToTensorIR(relax.PyExprMutator):
         return self.builder_.get()
 
 
-def map_dense(bb, call):
+def map_matmul(bb, call):
     x, w = call.args
-    return bb.call_te(topi.nn.dense, x, w)
+    return bb.call_te(topi.nn.matmul, x, w)
 
 def map_add(bb, call):
     a, b = call.args
@@ -317,11 +314,14 @@ def map_add(bb, call):
 def map_relu(bb, call):
     return bb.call_te(topi.nn.relu, call.args[0])
 
+def map_transpose(bb, call):
+    return bb.call_te(topi.transpose, call.args[0], )
 
 op_map = {
-  "relax.nn.dense": map_dense,
+  "relax.matmul": map_matmul,
   "relax.add": map_add,
-  "relax.nn.relu": map_relu
+  "relax.nn.relu": map_relu,
+  "relax.permute_dims": map_transpose
 }
 
 @tvm.ir.transform.module_pass(opt_level=0, name="LowerToTensorIR")
@@ -335,7 +335,7 @@ MLPModelTIR = LowerToTensorIRPass()(MLPFused)
 MLPModelTIR.show()
 ```
 
-Note that in the above code. `fused_dense_add0` and `fused_dense_add1` still are high-level relax functions that calls into the corresponding TensorIR dense and add functions. We can turn them into a single TensorIR function, which then can be used for follow-up optimization and code generation phases.
+Note that in the above code. `fused_matmul_add0` and `fused_matmul_add1` still are high-level relax functions that calls into the corresponding TensorIR matmul and add functions. We can turn them into a single TensorIR function, which then can be used for follow-up optimization and code generation phases.
 
 ```{.python .input}
 MLPModelFinal = relax.transform.FuseTIR()(MLPModelTIR)
@@ -378,7 +378,7 @@ print("Class:", class_names[label[0]])
 ```
 
 ```{.python .output}
-ex = relax.vm.build(MLPModelFinal, target="llvm")
+ex = relax.build(MLPModelFinal, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 data_nd = tvm.nd.array(img.reshape(1, 784))
 

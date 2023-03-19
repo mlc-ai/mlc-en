@@ -50,9 +50,9 @@ Now, let's take a further step: translate low-level NumPy implementation into Te
 @tvm.script.ir_module
 class MyAdd:
   @T.prim_func
-  def add(A: T.Buffer[(4, 4), "int64"],
-          B: T.Buffer[(4, 4), "int64"],
-          C: T.Buffer[(4, 4), "int64"]):
+  def add(A: T.Buffer((4, 4), "int64"),
+          B: T.Buffer((4, 4), "int64"),
+          C: T.Buffer((4, 4), "int64")):
     T.func_attr({"global_symbol": "add"})
     for i, j in T.grid(4, 4):
       with T.block("C"):
@@ -164,9 +164,9 @@ First, we introduce some new primitives, `parallel`, `vectorize` and `unroll`. T
 @tvm.script.ir_module
 class MyAdd:
   @T.prim_func
-  def add(A: T.Buffer[(4, 4), "int64"],
-          B: T.Buffer[(4, 4), "int64"],
-          C: T.Buffer[(4, 4), "int64"]):
+  def add(A: T.Buffer((4, 4), "int64"),
+          B: T.Buffer((4, 4), "int64"),
+          C: T.Buffer((4, 4), "int64")):
     T.func_attr({"global_symbol": "add"})
     for i, j in T.grid(4, 4):
       with T.block("C"):
@@ -228,7 +228,7 @@ In this exercise, let's focus on transform the original program to a specific ta
 @tvm.script.ir_module
 class TargetModule:
     @T.prim_func
-    def bmm_relu(A: T.Buffer[(16, 128, 128), "float32"], B: T.Buffer[(16, 128, 128), "float32"], C: T.Buffer[(16, 128, 128), "float32"]) -> None:
+    def bmm_relu(A: T.Buffer((16, 128, 128), "float32"), B: T.Buffer((16, 128, 128), "float32"), C: T.Buffer((16, 128, 128), "float32")) -> None:
         T.func_attr({"global_symbol": "bmm_relu", "tir.noalias": True})
         Y = T.alloc_buffer([16, 128, 128], dtype="float32")
         for i0 in T.parallel(16):

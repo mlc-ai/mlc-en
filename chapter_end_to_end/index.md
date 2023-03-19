@@ -375,7 +375,7 @@ In the last section, we discussed the abstraction that enables us to represent e
 IPython.display.Code(MyModule.script(), language="python")
 ```
 
-We call `relax.vm.build` to build this function. Relax is still under development, so some of the APIs may change. Our main goal, though, is to get familiar with the overall MLC flow (Construct, transform, build) for end-to-end models.
+We call `relax.build` to build this function. Relax is still under development, so some of the APIs may change. Our main goal, though, is to get familiar with the overall MLC flow (Construct, transform, build) for end-to-end models.
 
 ```{.python .input n=11}
 ex = relax.build(MyModule, target="llvm")
@@ -392,7 +392,7 @@ Now we are ready to run the model. We begin by constructing tvm NDArray that con
 
 ```{.python .input n=13}
 data_nd = tvm.nd.array(img.reshape(1, 784))
-nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}}
+nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}
 ```
 
 Then we can run the main function by passing in the input arguments and weights.

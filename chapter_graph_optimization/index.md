@@ -182,7 +182,7 @@ MLPModel.show()
 We aim to "fuse" the dense and add operations into a single group. The following code achieves that through the following steps:
 
 - Identify `matmul` and `add` patterns.
-- Generate another fused sub-function that calls into the dense and add operators.
+- Generate another fused sub-function that calls into the matmul and add operators.
 - Replace `matmul` and `add` with the fused sub-functions.
 
 ```{.python .input}

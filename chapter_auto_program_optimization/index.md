@@ -22,8 +22,6 @@ from tvm.ir.module import IRModule
 from tvm.script import tir as T, relax as R
 import numpy as np
 from tvm import relax
-# This is needed for deferring annotation parsing in TVMScript
-from __future__ import annotations 
 ```
 
 ```{.python .input n=1}
@@ -48,9 +46,9 @@ Let us begin by reviewing what we did in our previous chapters -- transforming a
 class MyModule:
     @T.prim_func
     def main(
-        A: T.Buffer[(128, 128), "float32"],
-        B: T.Buffer[(128, 128), "float32"],
-        C: T.Buffer[(128, 128), "float32"],
+        A: T.Buffer((128, 128), "float32"),
+        B: T.Buffer((128, 128), "float32"),
+        C: T.Buffer((128, 128), "float32"),
     ):
         T.func_attr({"global_symbol": "main", "tir.noalias": True})
         for i, j, k in T.grid(128, 128, 128):
@@ -295,31 +293,31 @@ Despite these magics, the key idea remains the same: **use stochastic transforma
 ```{.python .input n=25}
 from tvm import meta_schedule as ms
 
-sch_tuned = ms.tune_tir(
+database = ms.tune_tir(
     mod=MyModule,
     target="llvm --num-cores=1",
-    config=ms.TuneConfig(
-      max_trials_global=64,
-      num_trials_per_iter=64,
-    ),
+    max_trials_global=64,
+    num_trials_per_iter=64,
     space=ms.space_generator.ScheduleFn(stochastic_schedule_mm),
     work_dir="./tune_tmp",
     task_name="main"
 )
+
+sch = ms.tir_integration.compile_tir(database, MyModule, "llvm --num-cores=1")
 ```
 
 `tune_tir` functions return an optimized schedule found during the tuning process.
 
 ```{.python .input n=26}
-print(sch_tuned.trace)
+sch.trace.show()
 ```
 
 ```{.python .input n=27}
-IPython.display.HTML(code2html(sch_tuned.mod.script()))
+IPython.display.HTML(code2html(sch.mod.script()))
 ```
 
 ```{.python .input n=28}
-lib = tvm.build(sch_tuned.mod, target="llvm")
+lib = tvm.build(sch.mod, target="llvm")
 f_timer_after = lib.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule after tuning: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 ```
@@ -331,20 +329,19 @@ In the last section, we showed how to tune a workload with stochastic transforma
 Under the hood, the meta-scheduler analyzes each block's data access and loop patterns and proposes stochastic transformations to the program. We won't go into these generic transformations in this chapter but want to note that they are also just stochastic transformations coupled with an analysis of the code. We can use the same mechanisms learned in the last section to enhance auto-scheduling. We will touch base on this topic in future chapters.
 
 ```{.python .input n=29}
-sch_tuned = ms.tune_tir(
+database = ms.tune_tir(
     mod=MyModule,
     target="llvm --num-cores=1",
-    config=ms.TuneConfig(
-      max_trials_global=64,
-      num_trials_per_iter=64,
-    ),
+    max_trials_global=64,
+    num_trials_per_iter=64,
     work_dir="./tune_tmp",
     task_name="main",
 )
+sch = ms.tir_integration.compile_tir(database, MyModule, "llvm --num-cores=1")
 ```
 
 ```{.python .input n=30}
-lib = tvm.build(sch_tuned.mod, target="llvm")
+lib = tvm.build(sch.mod, target="llvm")
 f_timer_after = lib.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule after tuning: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 ```
@@ -356,11 +353,11 @@ The result gets much faster than our original code. We can take a glimpse at the
 - Parallelization and unrolling of loops.
 
 ```{.python .input n=31}
-sch_tuned.trace
+sch.trace.show()
 ```
 
 ```{.python .input n=32}
-IPython.display.HTML(code2html(sch_tuned.mod.script()))
+IPython.display.HTML(code2html(sch.mod.script()))
 ```
 
 ### Section Checkpoint
@@ -433,10 +430,10 @@ Let us use a mixture module where most of the components call into environment f
 @tvm.script.ir_module
 class MyModuleMixture: 
     @T.prim_func
-    def linear0(X: T.Buffer[(1, 784), "float32"], 
-                W: T.Buffer[(128, 784), "float32"], 
-                B: T.Buffer[(128,), "float32"], 
-                Z: T.Buffer[(1, 128), "float32"]):
+    def linear0(X: T.Buffer((1, 784), "float32"), 
+                W: T.Buffer((128, 784), "float32"), 
+                B: T.Buffer((128,), "float32"), 
+                Z: T.Buffer((1, 128), "float32")):
         T.func_attr({"global_symbol": "linear0", "tir.noalias": True})
         Y = T.alloc_buffer((1, 128), "float32")
         for i, j, k in T.grid(1, 128, 784):
@@ -452,15 +449,15 @@ class MyModuleMixture:
                 Z[vi, vj] =  Y[vi, vj] + B[vj]
 
     @R.function
-    def main(x: Tensor((1, 784), "float32"), 
-             w0: Tensor((128, 784), "float32"), 
-             b0: Tensor((128,), "float32"), 
-             w1: Tensor((10, 128), "float32"), 
-             b1: Tensor((10,), "float32")):
+    def main(x: R.Tensor((1, 784), "float32"), 
+             w0: R.Tensor((128, 784), "float32"), 
+             b0: R.Tensor((128,), "float32"), 
+             w1: R.Tensor((10, 128), "float32"), 
+             b1: R.Tensor((10,), "float32")):
         with R.dataflow():
-            lv0 = R.call_tir(linear0, (x, w0, b0), (1, 128), dtype="float32")
-            lv1 = R.call_tir("env.relu", (lv0,), (1, 128), dtype="float32")
-            out = R.call_tir("env.linear", (lv1, w1, b1), (1, 10), dtype="float32")
+            lv0 = R.call_dps_packed("linear0", (x, w0, b0), R.Tensor((1, 128), dtype="float32"))
+            lv1 = R.call_dps_packed("env.relu", (lv0,), R.Tensor((1, 128), dtype="float32"))
+            out = R.call_dps_packed("env.linear", (lv1, w1, b1), R.Tensor((1, 10), dtype="float32"))
             R.output(out)
         return out
 ```
@@ -493,7 +490,7 @@ MyModuleWithParams = relax.transform.BindParams("main", nd_params)(MyModuleMixtu
 ```
 
 ```{.python .input n=40}
-ex = relax.vm.build(MyModuleWithParams, target="llvm")
+ex = relax.build(MyModuleWithParams, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)
@@ -522,23 +519,22 @@ IPython.display.HTML(code2html(mod_linear.script()))
 ```
 
 ```{.python .input n=43}
-sch_tuned_linear = ms.tune_tir(
+database = ms.tune_tir(
     mod=mod_linear,
     target="llvm --num-cores=1",
-    config=ms.TuneConfig(
-      max_trials_global=64,
-      num_trials_per_iter=64,
-    ),
+    max_trials_global=64,
+    num_trials_per_iter=64,
     work_dir="./tune_tmp",
     task_name="main",
 )
+sch = ms.tir_integration.compile_tir(database, mod_linear, "llvm --num-cores=1")
 ```
 
 Now we need to replace the original `linear0` with the new function after tuning. We can do that by first getting a `global_var`, a `pointer` reference to the functions inside the IRModule, then calling `update_func` to replace the function with the new one.
 
 ```{.python .input n=44}
 MyModuleWithParams2 = relax.transform.BindParams("main", nd_params)(MyModuleMixture)
-new_func = sch_tuned_linear.mod["main"].with_attr("global_symbol", "linear0")
+new_func = sch.mod["main"].with_attr("global_symbol", "linear0")
 gv = MyModuleWithParams2.get_global_var("linear0")
 MyModuleWithParams2.update_func(gv, new_func)
 IPython.display.HTML(code2html(MyModuleWithParams2.script()))
@@ -547,7 +543,7 @@ IPython.display.HTML(code2html(MyModuleWithParams2.script()))
 We can find that the `linear0` has been replaced in the above code.
 
 ```{.python .input n=45}
-ex = relax.vm.build(MyModuleWithParams2, target="llvm")
+ex = relax.build(MyModuleWithParams2, target="llvm")
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)

@@ -30,7 +30,7 @@ c_np
 
 Before we directly write TensorIR, we should first translate high-level computation abstraction (e.g., `ndarray + ndarray`) to low-level python implementation (standard for loops with element access and operation)
 
-Notably, the initial value of the o utput array (or buffer) is not always `0`. We need to write or initialize it in our implementation, which is important for reduction operator (e.g. matmul and conv)
+Notably, the initial value of the output array (or buffer) is not always `0`. We need to write or initialize it in our implementation, which is important for reduction operator (e.g. matmul and conv)
 
 ```{.python .input n=3}
 # low-level numpy version
@@ -158,7 +158,7 @@ np.testing.assert_allclose(conv_tvm.numpy(), conv_torch, rtol=1e-5)
 In the lecture, we learned that TensorIR is not only a programming language but also an abstraction for program transformation. In this section, let's try to transform the program. We take `bmm_relu` (`batched_matmul_relu`) in our studies, which is a variant of operations that common appear in models such as transformers.
 
 #### Parallel, Vectorize and Unroll
-First, we introduce some new primitives, `parallel`, `vectorize` and `unroll`. These three primitives operates on loops to indicate how this loop execute. Here is the example:
+First, we introduce some new primitives, `parallel`, `vectorize` and `unroll`. These three primitives operate on loops to indicate how this loop executes. Here is the example:
 
 ```{.python .input n=9}
 @tvm.script.ir_module

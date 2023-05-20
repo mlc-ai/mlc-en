@@ -186,7 +186,7 @@ Y[vi, vj] = Y[vi, vj] + A[vi, vk] * B[vk, vj]
 
 ```
 
-A **block** is a basic unit of computation in TensorIR. Notably, the block contains a few additional information than the plain NumPy code. A block contains a set of block axes (`vi, vj, vk`) and computations defined around them.
+A **block** is a basic unit of computation in TensorIR. Notably, the block contains a few additional pieces of information compared to the plain NumPy code. A block contains a set of block axes (`vi, vj, vk`) and computations defined around them.
 
 ```python
 vi = T.axis.spatial(128, i)
@@ -214,15 +214,15 @@ The figure below summarizes the block (iteration) axes and the read write relati
 
 ![](../img/tensor_ir_block_axis.png)
 
-In our example, block Y computes the result `Y[vi, vj]` by reading values from `A[vi, vk]` and `B[vk, vj]` and perform sum over all possible `vk`. In this particular example, if we fix `vi`, `vj` to be `(0, 1)`, and run the block for `vk in range(0, 128)`, we can effectively compute `C[0, 1]` independent from other possible locations (that have different values of vi, vj).
+In our example, block Y computes the result `Y[vi, vj]` by reading values from `A[vi, vk]` and `B[vk, vj]` and perform sum over all possible `vk`. In this particular example, if we fix `vi`, `vj` to be `(0, 1)`, and run the block for `vk in range(0, 128)`, we can effectively compute `C[0, 1]` independently from other possible locations (that have different values of vi, vj).
 
-Notably, for a fixed value of vi and vj, the computation block produces a point value at a spatial location of Y (`Y[vi, vj]`) that is independent from other locations in `Y` (with a different `vi, vj` values). we can call `vi`, `vj` **spatial axes** as they directly corresponds to the beginning of a spatial region of buffers that the block writes to. The axes that involves in reduction (`vk`) are named as **reduce axes**.
+Notably, for a fixed value of vi and vj, the computation block produces a point value at a spatial location of Y (`Y[vi, vj]`) that is independent from other locations in `Y` (with a different `vi, vj` values). We can call `vi`, `vj` **spatial axes** as they directly correspond to the beginning of a spatial region of buffers that the block writes to. The axes involved in reduction (`vk`) are named **reduce axes**.
 
 #### Why Extra Information in Block
 
-One crucial observation is that the additional information (block axis range and their properties) makes the block to be **self-contained** when it comes to the iterations that it is supposed to carry out independent from the external loop-nest `i`, `j`, `k`.
+One crucial observation is that the additional information (block axis range and their properties) makes the block **self-contained** when it comes to the iterations that it is supposed to carry out independently from the external loop-nest `i`, `j`, `k`.
 
-The block axis information also provides additional properties that help us to validate the correctness of the external loops that are used to carry out the computation. For example, the code block below will result in an error because the loop expects an iterator of size `128`, but we only bound it to a for loop of size `127`.
+The block axis information also provides additional properties that help us validate the correctness of the external loops used to carry out the computation. For example, the code block below will result in an error because the loop expects an iterator of size `128`, but we only bound it to a for loop of size `127`.
 
 
 ```python
@@ -237,7 +237,7 @@ for i in range(127):
 
 This additional information also helps us in following machine learning compilation analysis. For example, while we can always parallelize over spatial axes, parallelizing over reduce axes will require specific strategies.
 
-#### Sugars for Block Axes Binding
+#### Sugar for Block Axes Binding
 
 In situations where each of the block axes is directly mapped to an outer loop iterator, we can use `T.axis.remap` to declare the block axis in a single line.
 
@@ -285,11 +285,11 @@ The function attribute information contains extra information about the function
 T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
 ```
 
-Here `global_symbol` corresponds to the name of the function, and `tir.noalias` is an attribute indicating that all the buffer memories do not overlap. You also feel free safely skip these attributes for now as they won't affect the overall understanding of the high-level concepts.
+Here `global_symbol` corresponds to the name of the function, and `tir.noalias` is an attribute indicating that all the buffer memory areas do not overlap. You also feel free safely skip these attributes for now as they won't affect the overall understanding of the high-level concepts.
 
 The two decorators, `@tvm.script.ir_module` and `@T.prim_func` are used to indicate the type of the corresponding part.
 
-`@tvm.script.ir_module` indicate that MyModule is an `IRModule`. IRModule is the container object to hold a collection of tensor functions in machine learning compilation.
+`@tvm.script.ir_module` indicates that MyModule is an `IRModule`. IRModule is the container object to hold a collection of tensor functions in machine learning compilation.
 
 
 ```{.python .input n=6}
@@ -333,7 +333,7 @@ So far, we have gone through one example instance of TensorIR program and covere
 
 - Buffer declarations in parameters and intermediate temporary memory.
 - For loop iterations.
-- **Block** and block axes properties.
+- **Blocks** and block axes properties.
 
 In this section, we have gone through one example instance of TensorIR that covers the most common elements in MLC.
 
@@ -345,7 +345,7 @@ In the last section, we learned about TensorIR and its key elements. Now, let us
 
 In the last section, we have given an example of how to write `mm_relu` using low-level numpy. In practice, there can be multiple ways to implement the same functionality, and each implementation can result in different performance.
 
-We will discuss the reason behind the performance and how to leverage those variants in future lectures. In this lecture, let us focus on the ability to get different implementation variants using transformations.
+We will discuss the reason behind the performance difference and how to leverage those variants in future lectures. In this lecture, let us focus on the ability to get different implementation variants using transformations.
 
 ```{.python .input n=9}
 def lnumpy_mm_relu_v2(A: np.ndarray, B: np.ndarray, C: np.ndarray):
@@ -372,7 +372,7 @@ The above code block shows a slightly different variation of `mm_relu`. To see t
 - We replace the `j` loop with two loops, `j0` and `j1`.
 - The order of iterations changes slightly
 
-In order to get `lnumpy_mm_relu_v2`, we have to rewrite a new function (or manual copy-pasting and editing). TensorIR introduces a utility called Schedule that allows us to do that pragmatically.
+In order to get `lnumpy_mm_relu_v2`, we have to rewrite it into a new function (or manually copy-paste and edit). TensorIR introduces a utility called Schedule that allows us to do that pragmatically.
 
 To remind ourselves, let us look again at the current MyModule content.
 
@@ -576,9 +576,9 @@ TVMScript is also a useful way to inspect the tensor functions in the middle of 
 
 #### Generate TensorIR code using Tensor Expression
 
-In many cases, our development forms are higher-level abstractions that are not at the loop level. So another common way to obtain TensorIR is pragmatically generating relevant code.
+In many cases, our development forms are higher-level abstractions that are not at the loop level. So another common way to obtain TensorIR is programmatically generating relevant code.
 
-Tensor expression (te) is a domain-specific language that describes a sequence of computations via an expression like API.
+Tensor expression (te) is a domain-specific language that describes a sequence of computations via an expression-like API.
 
 ```{.python .input n=26}
 from tvm import te
@@ -606,9 +606,9 @@ IPython.display.Code(MyModuleFromTE.script(), language="python")
 
 The tensor expression API provides a helpful tool to generate TensorIR functions for a given higher-level input.
 
-### TensorIR Functions as Result of Transformations
+### TensorIR Functions as Results of Transformations
 
-In practice, we also get TensorIR functions as results of transformations. This happens when we start with two primitive tensor functions (mm and relu), then apply a pragmatic transformation to "fuse" them into a single primitive tensor function, ` mm_relu`. We will cover the details in future chapters.
+In practice, we also get TensorIR functions as results of transformations. This happens when we start with two primitive tensor functions (mm and relu), then apply a programmatic transformation to "fuse" them into a single primitive tensor function, ` mm_relu`. We will cover the details in future chapters.
 
 
 ### Discussions

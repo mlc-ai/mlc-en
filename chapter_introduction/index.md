@@ -96,9 +96,9 @@ MLC is effectively a process of transforming and assembling tensor functions und
     - Leveraging hardware native acceleration
     - Optimization in general
 - Why study ML compilation
-    - Build ML deployment solutions.
-    - In-depth view of existing ML frameworks.
-    - Build up software stack for emerging hardware.
+    - Build ML deployment solutions
+    - In-depth view of existing ML frameworks
+    - Build up software stack for emerging hardware
 - Key elements of ML compilation
-    - Tensor and tensor functions.
+    - Tensor and tensor functions
     - Abstraction and implementation are useful tools to think

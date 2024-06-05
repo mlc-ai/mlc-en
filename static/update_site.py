@@ -14,6 +14,7 @@ def py_str(cstr):
 # list of files to skip
 skip_list = set(
     [
+        "models.html",
         "wheels.html",
         ".gitignore",
         ".nojekyll",

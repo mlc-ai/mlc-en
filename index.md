@@ -1,4 +1,4 @@
-# Machine Learning Compilation
+# Machine Learning Compiler
 
 Deploying innovative AI models in different production environments becomes a common problem as AI applications become more ubiquitous in our daily lives.
 Deployment of both training and inference workloads bring great challenges as we start to support a combinatorial choice of models and environment.

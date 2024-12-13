@@ -310,7 +310,6 @@ print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean 
 So far, we have been manually writing transformations to optimize the TensorIR program on GPU. We can leverage the automatic program optimization framework to tune the same program. The following code does that, we only set a small number here, and it can take a few min to finish.
 
 ```python
-
 from tvm import meta_schedule as ms
 
 database = ms.tune.tune_tasks(

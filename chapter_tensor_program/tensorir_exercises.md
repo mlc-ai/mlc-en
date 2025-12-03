@@ -60,10 +60,10 @@ class MyAdd:
         vj = T.axis.spatial(4, j)
         C[vi, vj] = A[vi, vj] + B[vi, vj]
 
-rt_lib = tvm.build(MyAdd, target="llvm")
-a_tvm = tvm.nd.array(a)
-b_tvm = tvm.nd.array(b)
-c_tvm = tvm.nd.array(np.empty((4, 4), dtype=np.int64))
+rt_lib = tvm.compile(MyAdd, target="llvm")
+a_tvm = tvm.runtime.tensor(a)
+b_tvm = tvm.runtime.tensor(b)
+c_tvm = tvm.runtime.tensor(np.empty((4, 4), dtype=np.int64))
 rt_lib["add"](a_tvm, b_tvm, c_tvm)
 np.testing.assert_allclose(c_tvm.numpy(), c_np, rtol=1e-5)
 ```
@@ -97,10 +97,10 @@ class MyAdd:
     # TODO
     ...
 
-rt_lib = tvm.build(MyAdd, target="llvm")
-a_tvm = tvm.nd.array(a)
-b_tvm = tvm.nd.array(b)
-c_tvm = tvm.nd.array(np.empty((4, 4), dtype=np.int64))
+rt_lib = tvm.compile(MyAdd, target="llvm")
+a_tvm = tvm.runtime.tensor(a)
+b_tvm = tvm.runtime.tensor(b)
+c_tvm = tvm.runtime.tensor(np.empty((4, 4), dtype=np.int64))
 rt_lib["add"](a_tvm, b_tvm, c_tvm)
 np.testing.assert_allclose(c_tvm.numpy(), c_np, rtol=1e-5)
 ```
@@ -145,10 +145,10 @@ class MyConv:
     # TODO
     ...
 
-rt_lib = tvm.build(MyConv, target="llvm")
-data_tvm = tvm.nd.array(data)
-weight_tvm = tvm.nd.array(weight)
-conv_tvm = tvm.nd.array(np.empty((N, CO, OUT_H, OUT_W), dtype=np.int64))
+rt_lib = tvm.compile(MyConv, target="llvm")
+data_tvm = tvm.runtime.tensor(data)
+weight_tvm = tvm.runtime.tensor(weight)
+conv_tvm = tvm.runtime.tensor(np.empty((N, CO, OUT_H, OUT_W), dtype=np.int64))
 rt_lib["conv"](data_tvm, weight_tvm, conv_tvm)
 np.testing.assert_allclose(conv_tvm.numpy(), conv_torch, rtol=1e-5)
 ```
@@ -302,17 +302,17 @@ print("Pass")
 Finally we can evaluate the performance of the transformed program.
 
 ```python
-before_rt_lib = tvm.build(MyBmmRelu, target="llvm")
-after_rt_lib = tvm.build(sch.mod, target="llvm")
-a_tvm = tvm.nd.array(np.random.rand(16, 128, 128).astype("float32"))
-b_tvm = tvm.nd.array(np.random.rand(16, 128, 128).astype("float32"))
-c_tvm = tvm.nd.array(np.random.rand(16, 128, 128).astype("float32"))
+before_rt_lib = tvm.compile(MyBmmRelu, target="llvm")
+after_rt_lib = tvm.compile(sch.mod, target="llvm")
+a_tvm = tvm.runtime.tensor(np.random.rand(16, 128, 128).astype("float32"))
+b_tvm = tvm.runtime.tensor(np.random.rand(16, 128, 128).astype("float32"))
+c_tvm = tvm.runtime.tensor(np.random.rand(16, 128, 128).astype("float32"))
 after_rt_lib["bmm_relu"](a_tvm, b_tvm, c_tvm)
-before_timer = before_rt_lib.time_evaluator("bmm_relu", tvm.cpu())
+before_timer = before_rt_lib.mod.time_evaluator("bmm_relu", tvm.cpu())
 print("Before transformation:")
 print(before_timer(a_tvm, b_tvm, c_tvm))
 
-f_timer = after_rt_lib.time_evaluator("bmm_relu", tvm.cpu())
+f_timer = after_rt_lib.mod.time_evaluator("bmm_relu", tvm.cpu())
 print("After transformation:")
 print(f_timer(a_tvm, b_tvm, c_tvm))
 ```

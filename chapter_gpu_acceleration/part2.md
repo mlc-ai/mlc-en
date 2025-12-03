@@ -125,12 +125,12 @@ This block reads from a 16x16 region from `A` and `B`, and writes to a 16x16 reg
 We can run the following code to confirm that the TensorIR module produces the correct result.
 
 ```{.python .input}
-a_nd = tvm.nd.array(a_np)
-b_nd = tvm.nd.array(b_np)
+a_nd = tvm.runtime.tensor(a_np)
+b_nd = tvm.runtime.tensor(b_np)
 
-c_nd = tvm.nd.empty((1024, 1024), dtype="float32")
+c_nd = tvm.runtime.tensor(np.empty((1024, 1024), dtype="float32"))
 
-lib = tvm.build(MatmulBlockModule, target="llvm")
+lib = tvm.compile(MatmulBlockModule, target="llvm")
 lib["main"](a_nd, b_nd, c_nd)
 np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```
@@ -312,12 +312,12 @@ We can then go and execute the following code-block, which redirects the tensori
 ```
 <!-- todo -->
 <!-- For CI, do not run this part of the code -->
-a_nd = tvm.nd.array(a_np)
-b_nd = tvm.nd.array(b_np)
+a_nd = tvm.runtime.tensor(a_np)
+b_nd = tvm.runtime.tensor(b_np)
 
-c_nd = tvm.nd.empty((1024, 1024), dtype="float32")
+c_nd = tvm.runtime.tensor(np.empty((1024, 1024), dtype="float32"))
 
-lib = tvm.build(sch.mod, target="llvm")
+lib = tvm.compile(sch.mod, target="llvm")
 lib["main"](a_nd, b_nd, c_nd)
 np.testing.assert_allclose(c_nd.numpy(), c_tmm, rtol=1e-5)
 ```

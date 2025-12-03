@@ -378,7 +378,8 @@ print("Class:", class_names[label[0]])
 ```
 
 ```{.python .output}
-ex = relax.build(MLPModelFinal, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MLPModelFinal, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 data_nd = tvm.nd.array(img.reshape(1, 784))
 

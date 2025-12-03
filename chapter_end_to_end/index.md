@@ -375,10 +375,11 @@ In the last section, we discussed the abstraction that enables us to represent e
 IPython.display.Code(MyModule.script(), language="python")
 ```
 
-We call `relax.build` to build this function. Relax is still under development, so some of the APIs may change. Our main goal, though, is to get familiar with the overall MLC flow (Construct, transform, build) for end-to-end models.
+We call `tvm.compile` to build this function. Relax is still under development, so some of the APIs may change. Our main goal, though, is to get familiar with the overall MLC flow (Construct, transform, build) for end-to-end models.
 
 ```{.python .input n=11}
-ex = relax.build(MyModule, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModule, target)
 type(ex)
 ```
 
@@ -391,8 +392,8 @@ vm = relax.VirtualMachine(ex, tvm.cpu())
 Now we are ready to run the model. We begin by constructing tvm NDArray that contains input data and weights.
 
 ```{.python .input n=13}
-data_nd = tvm.nd.array(img.reshape(1, 784))
-nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}
+data_nd = tvm.runtime.tensor(img.reshape(1, 784))
+nd_params = {k: tvm.runtime.tensor(v) for k, v in mlp_params.items()}
 ```
 
 Then we can run the main function by passing in the input arguments and weights.
@@ -451,11 +452,11 @@ These strings are names of runtime functions that we expect to exist during mode
 In order to be able to execute the code that calls into external functions, we need to register the corresponding functions. The code block below registers two implementations of the functions.
 
 ```{.python .input n=17}
-@tvm.register_func("env.linear", override=True)
-def torch_linear(x: tvm.nd.NDArray,
-                 w: tvm.nd.NDArray,
-                 b: tvm.nd.NDArray,
-                 out: tvm.nd.NDArray):
+@tvm.register_global_func("env.linear", override=True)
+def torch_linear(x: tvm.runtime.Tensor,
+                 w: tvm.runtime.Tensor,
+                 b: tvm.runtime.Tensor,
+                 out: tvm.runtime.Tensor):
     x_torch = torch.from_dlpack(x)
     w_torch = torch.from_dlpack(w)
     b_torch = torch.from_dlpack(b)
@@ -463,9 +464,9 @@ def torch_linear(x: tvm.nd.NDArray,
     torch.mm(x_torch, w_torch.T, out=out_torch)
     torch.add(out_torch, b_torch, out=out_torch)
 
-@tvm.register_func("env.relu", override=True)
-def lnumpy_relu(x: tvm.nd.NDArray,
-                out: tvm.nd.NDArray):
+@tvm.register_global_func("env.relu", override=True)
+def lnumpy_relu(x: tvm.runtime.Tensor,
+                out: tvm.runtime.Tensor):
     x_torch = torch.from_dlpack(x)
     out_torch = torch.from_dlpack(out)
     torch.maximum(x_torch, torch.Tensor([0.0]), out=out_torch)
@@ -482,7 +483,8 @@ This particular example performs the registration in python. In reality, we can 
 Now we can build and run `MyModuleWithExternCall`, and we can verify that we get the same result.
 
 ```{.python .input n=18}
-ex = relax.build(MyModuleWithExternCall, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModuleWithExternCall, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd,
@@ -542,7 +544,8 @@ class MyModuleMixture:
 The above code block shows an example where linear0 is still implemented in TensorIR, while the rest of the functions are redirected to library functions. We can build and run to validate the result.
 
 ```{.python .input n=20}
-ex = relax.build(MyModuleMixture, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModuleMixture, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd,
@@ -567,7 +570,8 @@ IPython.display.Code(MyModuleWithParams.script(), language="python")
 In the above script, `meta[relay.Constant][0]` corresponds to an implicit dictionary that stores the constant (which is not shown as part of the script but still is part of the IRModule). If we build the transformed IRModule, we can now invoke the function by just passing in the input data.
 
 ```{.python .input n=22}
-ex = relax.build(MyModuleWithParams, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModuleWithParams, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)

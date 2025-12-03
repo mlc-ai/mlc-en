@@ -7,7 +7,7 @@ In the past chapter, we discussed  MLC flows in CPU environments. This chapter w
 For this course, we will use some ongoing development in TVM, which is an open-source machine learning compilation framework. We provide the following command to install a packaged version for MLC course. The particular notebook of **part 1** depends on a CUDA 11 environment.
 
 ```bash
-python3 -m pip install mlc-ai-nightly-cu110 -f https://mlc.ai/wheels
+python3 -m pip install --pre -U -f https://mlc.ai/wheels mlc-ai-nightly-cu128
 ```
 
 **NOTE: Our build system does not have GPU support yet, so part of codes will not be evaluated.**
@@ -77,13 +77,13 @@ sch.mod.show()
 We can build and test out the resulting function on the GPU.
 
 ```python
-rt_mod = tvm.build(sch.mod, target="cuda")
+rt_mod = tvm.compile(sch.mod, target="cuda")
 
 A_np = np.random.uniform(size=(1024,)).astype("float32")
 B_np = np.random.uniform(size=(1024,)).astype("float32")
-A_nd = tvm.nd.array(A_np, tvm.cuda(0))
-B_nd = tvm.nd.array(B_np, tvm.cuda(0))
-C_nd = tvm.nd.array(np.zeros((1024,), dtype="float32"), tvm.cuda(0))
+A_nd = tvm.runtime.tensor(A_np)
+B_nd = tvm.runtime.tensor(B_np)
+C_nd = tvm.runtime.tensor(np.zeros((1024,), dtype="float32"))
 
 rt_mod["main"](A_nd, B_nd, C_nd)
 print(A_nd)
@@ -101,8 +101,8 @@ Now, let us move forward to another example -- window sum. This program can be v
 @tvm.script.ir_module
 class MyModuleWindowSum:
     @T.prim_func
-    def main(A: T.Buffer[(1027,), "float32"],
-             B: T.Buffer[(1024,), "float32"]) -> None:
+    def main(A: T.Buffer((1027,), "float32"),
+             B: T.Buffer((1024,), "float32")) -> None:
         T.func_attr({"global_symbol": "main", "tir.noalias": True})
         for i in T.grid(1024):
             with T.block("C"):
@@ -152,7 +152,7 @@ We can print out the cuda kernel using the following code. We still need both th
 Notably, the build process automatically compacts the shared memory stage to use a minimum region used within the thread block.
 
 ```python
-rt_mod = tvm.build(sch.mod, target="cuda")
+rt_mod = tvm.compile(sch.mod, target="cuda")
 print(rt_mod.imported_modules[0].get_source())
 ```
 
@@ -161,7 +161,7 @@ print(rt_mod.imported_modules[0].get_source())
 A MLC process usually support targeting multiple kinds of hardware platforms, we can generate Metal code(which is another kind of GPU programming model) by changing the target parameter.
 
 ```python
-rt_mod = tvm.build(sch.mod, target="metal")
+rt_mod = tvm.compile(sch.mod, target="metal")
 print(rt_mod.imported_modules[0].get_source())
 ```
 
@@ -227,16 +227,16 @@ sch.mod.show()
 ```
 
 ```python
-rt_mod = tvm.build(sch.mod, target="cuda")
+rt_mod = tvm.compile(sch.mod, target="cuda")
 dev = tvm.cuda(0)
 A_np = np.random.uniform(size=(1024, 1024)).astype("float32")
 B_np = np.random.uniform(size=(1024, 1024)).astype("float32")
-A_nd = tvm.nd.array(A_np, dev)
-B_nd = tvm.nd.array(B_np, dev)
-C_nd = tvm.nd.array(np.zeros((1024, 1024), dtype="float32"), dev)
+A_nd = tvm.runtime.tensor(A_np)
+B_nd = tvm.runtime.tensor(B_np)
+C_nd = tvm.runtime.tensor(np.zeros((1024, 1024), dtype="float32"))
 
 num_flop = 2 * 1024 * 1024 * 1024
-evaluator = rt_mod.time_evaluator("main", dev, number=10)
+evaluator = rt_mod.mod.time_evaluator("main", dev, number=10)
 
 print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```
@@ -298,9 +298,9 @@ sch.mod.show()
 ```
 
 ```python
-rt_mod = tvm.build(sch.mod, target="cuda")
+rt_mod = tvm.compile(sch.mod, target="cuda")
 dev = tvm.cuda(0)
-evaluator = rt_mod.time_evaluator("main", dev, number=10)
+evaluator = rt_mod.mod.time_evaluator("main", dev, number=10)
 
 print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```
@@ -324,9 +324,9 @@ sch.mod.show()
 ```
 
 ```python
-rt_mod = tvm.build(sch.mod, target="nvidia/tesla-p100")
+rt_mod = tvm.compile(sch.mod, target="nvidia/tesla-p100")
 dev = tvm.cuda(0)
-evaluator = rt_mod.time_evaluator("main", dev, number=10)
+evaluator = rt_mod.mod.time_evaluator("main", dev, number=10)
 
 print("MetaSchedule: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean / 1e9))
 ```

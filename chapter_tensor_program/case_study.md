@@ -5,7 +5,7 @@
 For the purpose of this course, we will use some on-going development in tvm, which is an open source machine learning compilation framework. We provide the following command to install a packaged version for mlc course.
 
 ```bash
-python3 -m  pip install mlc-ai-nightly -f https://mlc.ai/wheels
+python -m pip install --pre -U -f https://mlc.ai/wheels mlc-ai-nightly-cpu
 ```
 
 ### Prelude
@@ -129,9 +129,9 @@ First, let us see the function parameters. The function parameters correspond to
 
 ```python
 # TensorIR
-def mm_relu(A: T.Buffer[(128, 128), "float32"],
-            B: T.Buffer[(128, 128), "float32"],
-            C: T.Buffer[(128, 128), "float32"]):
+def mm_relu(A: T.Buffer((128, 128), "float32"),
+            B: T.Buffer((128, 128), "float32"),
+            C: T.Buffer((128, 128), "float32")):
     ...
 # numpy
 def lnumpy_mm_relu(A: np.ndarray, B: np.ndarray, C: np.ndarray):
@@ -333,7 +333,7 @@ So far, we have gone through one example instance of TensorIR program and covere
 
 - Buffer declarations in parameters and intermediate temporary memory.
 - For loop iterations.
-- **Blocks** and block axes properties.
+- Blocks and block axes properties.
 
 In this section, we have gone through one example instance of TensorIR that covers the most common elements in MLC.
 
@@ -476,15 +476,15 @@ First, we call a build function to turn an IRModule into a `runtime.Module`, rep
 When we target different platforms(e.g. an Android phone) or platforms with special instructions (intel skylake), we will need to adjust the target accordingly. We will discuss different target choices as we start to deploy to those environments.
 
 ```{.python .input n=18}
-rt_lib = tvm.build(MyModule, target="llvm")
+rt_lib = tvm.compile(MyModule, target="llvm")
 ```
 
 Then, we will create three tvm ndarrays that are used to hold inputs and the output.
 
 ```{.python .input n=19}
-a_nd = tvm.nd.array(a_np)
-b_nd = tvm.nd.array(b_np)
-c_nd = tvm.nd.empty((128, 128), dtype="float32")
+a_nd = tvm.runtime.tensor(a_np)
+b_nd = tvm.runtime.tensor(b_np)
+c_nd = tvm.runtime.tensor(np.empty((128, 128), dtype="float32"))
 type(c_nd)
 ```
 
@@ -500,7 +500,7 @@ np.testing.assert_allclose(c_mm_relu, c_nd.numpy(), rtol=1e-5)
 We have built and run the original MyModule. We can also build the transformed program.
 
 ```{.python .input n=21}
-rt_lib_after = tvm.build(sch.mod, target="llvm")
+rt_lib_after = tvm.compile(sch.mod, target="llvm")
 rt_lib_after["mm_relu"](a_nd, b_nd, c_nd)
 np.testing.assert_allclose(c_mm_relu, c_nd.numpy(), rtol=1e-5)
 ```
@@ -508,9 +508,9 @@ np.testing.assert_allclose(c_mm_relu, c_nd.numpy(), rtol=1e-5)
 Finally, we can compare the time difference between the two. `time_evaluator` is a helper benchmarking function that can be used to compare the running performance of different generated functions.
 
 ```{.python .input n=22}
-f_timer_before = rt_lib.time_evaluator("mm_relu", tvm.cpu())
+f_timer_before = rt_lib.mod.time_evaluator("mm_relu", tvm.cpu())
 print("Time cost of MyModule %g sec" % f_timer_before(a_nd, b_nd, c_nd).mean)
-f_timer_after = rt_lib_after.time_evaluator("mm_relu", tvm.cpu())
+f_timer_after = rt_lib_after.mod.time_evaluator("mm_relu", tvm.cpu())
 print("Time cost of transformed sch.mod %g sec" % f_timer_after(a_nd, b_nd, c_nd).mean)
 ```
 
@@ -557,8 +557,8 @@ def transform(mod, jfactor):
 
 mod_transformed = transform(MyModule, jfactor=8)
 
-rt_lib_transformed = tvm.build(mod_transformed, "llvm")
-f_timer_transformed = rt_lib_transformed.time_evaluator("mm_relu", tvm.cpu())
+rt_lib_transformed = tvm.compile(mod_transformed, "llvm")
+f_timer_transformed = rt_lib_transformed.mod.time_evaluator("mm_relu", tvm.cpu())
 print("Time cost of transformed mod_transformed %g sec" % f_timer_transformed(a_nd, b_nd, c_nd).mean)
 # display the code below
 IPython.display.Code(mod_transformed.script(), language="python")

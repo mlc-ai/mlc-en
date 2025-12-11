@@ -381,7 +381,7 @@ print("Class:", class_names[label[0]])
 target = tvm.target.Target("llvm", host="llvm")
 ex = tvm.compile(MLPModelFinal, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
-data_nd = tvm.nd.array(img.reshape(1, 784))
+data_nd = tvm.runtime.tensor(img.reshape(1, 784))
 
 nd_res = vm["main"](data_nd)
 

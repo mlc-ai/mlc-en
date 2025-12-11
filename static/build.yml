@@ -3,5 +3,5 @@ dependencies:
   - pip
   - pip:
     - ..  # d2l
-    - mlc-ai-nightly
+    - mlc-ai-nightly-cpu
     - -f https://mlc.ai/wheels

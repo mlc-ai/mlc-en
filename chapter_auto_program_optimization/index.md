@@ -71,12 +71,12 @@ c_mm = a_np @ b_np
 We can build and run `MyModule` as follows.
 
 ```{.python .input n=4}
-a_nd = tvm.nd.array(a_np)
-b_nd = tvm.nd.array(b_np)
-c_nd = tvm.nd.empty((128, 128), dtype="float32")
+a_nd = tvm.runtime.tensor(a_np)
+b_nd = tvm.runtime.tensor(b_np)
+c_nd = tvm.runtime.tensor(np.empty((128, 128), dtype="float32"))
 
-lib = tvm.build(MyModule, target="llvm")
-f_timer_before = lib.time_evaluator("main", tvm.cpu())
+lib = tvm.compile(MyModule, target="llvm")
+f_timer_before = lib.mod.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule: %.3f ms" % (f_timer_before(a_nd, b_nd, c_nd).mean * 1000))
 ```
 
@@ -101,8 +101,8 @@ IPython.display.HTML(code2html(sch.mod.script()))
 Then we can build and run the re-organized program.
 
 ```{.python .input n=7}
-lib = tvm.build(sch.mod, target="llvm")
-f_timer_after = lib.time_evaluator("main", tvm.cpu())
+lib = tvm.compile(sch.mod, target="llvm")
+f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule=>schedule_mm: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 ```
 
@@ -257,8 +257,8 @@ def random_search(mod: tvm.IRModule, num_trials=5):
 
     for i in range(num_trials):
         sch = stochastic_schedule_mm(tvm.tir.Schedule(mod))
-        lib = tvm.build(sch.mod, target="llvm")
-        f_timer_after = lib.time_evaluator("main", tvm.cpu())
+        lib = tvm.compile(sch.mod, target="llvm")
+        f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
         result = f_timer_after(a_nd, b_nd, c_nd).mean
 
         print("=====Attempt %d, time-cost: %.3f ms====" % (i, result * 1000))
@@ -316,8 +316,8 @@ IPython.display.HTML(code2html(sch.mod.script()))
 ```
 
 ```{.python .input n=28}
-lib = tvm.build(sch.mod, target="llvm")
-f_timer_after = lib.time_evaluator("main", tvm.cpu())
+lib = tvm.compile(sch.mod, target="llvm")
+f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule after tuning: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 ```
 
@@ -339,8 +339,8 @@ sch = ms.tir_integration.compile_tir(database, MyModule, "llvm --num-cores=1")
 ```
 
 ```{.python .input n=30}
-lib = tvm.build(sch.mod, target="llvm")
-f_timer_after = lib.time_evaluator("main", tvm.cpu())
+lib = tvm.compile(sch.mod, target="llvm")
+f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
 print("Time cost of MyModule after tuning: %.3f ms" % (f_timer_after(a_nd, b_nd, c_nd).mean * 1000))
 ```
 
@@ -418,8 +418,8 @@ As a reminder, the above figure shows the model of interest.
 import pickle as pkl
 mlp_params = pkl.load(open("fasionmnist_mlp_params.pkl", "rb"))
 
-data_nd = tvm.nd.array(img.reshape(1, 784))
-nd_params = {k: tvm.nd.array(v) for k, v in mlp_params.items()}
+data_nd = tvm.runtime.tensor(img.reshape(1, 784))
+nd_params = {k: tvm.runtime.tensor(v) for k, v in mlp_params.items()}
 ```
 
 Let us use a mixture module where most of the components call into environment function and also come with one TensorIR function `linear0`.
@@ -461,11 +461,11 @@ class MyModuleMixture:
 ```
 
 ```{.python .input n=38}
-@tvm.register_func("env.linear", override=True)
-def torch_linear(x: tvm.nd.NDArray, 
-                 w: tvm.nd.NDArray, 
-                 b: tvm.nd.NDArray, 
-                 out: tvm.nd.NDArray):
+@tvm.register_global_func("env.linear", override=True)
+def torch_linear(x: tvm.runtime.Tensor, 
+                 w: tvm.runtime.Tensor, 
+                 b: tvm.runtime.Tensor, 
+                 out: tvm.runtime.Tensor):
     x_torch = torch.from_dlpack(x)
     w_torch = torch.from_dlpack(w)
     b_torch = torch.from_dlpack(b)
@@ -473,9 +473,9 @@ def torch_linear(x: tvm.nd.NDArray,
     torch.mm(x_torch, w_torch.T, out=out_torch)
     torch.add(out_torch, b_torch, out=out_torch)
 
-@tvm.register_func("env.relu", override=True)
-def lnumpy_relu(x: tvm.nd.NDArray, 
-                out: tvm.nd.NDArray):
+@tvm.register_global_func("env.relu", override=True)
+def lnumpy_relu(x: tvm.runtime.Tensor, 
+                out: tvm.runtime.Tensor):
     x_torch = torch.from_dlpack(x)
     out_torch = torch.from_dlpack(out)
     torch.maximum(x_torch, torch.Tensor([0.0]), out=out_torch)
@@ -488,7 +488,8 @@ MyModuleWithParams = relax.transform.BindParams("main", nd_params)(MyModuleMixtu
 ```
 
 ```{.python .input n=40}
-ex = relax.build(MyModuleWithParams, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModuleWithParams, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)
@@ -540,7 +541,8 @@ IPython.display.HTML(code2html(MyModuleWithParams2.script()))
 We can find that the `linear0` has been replaced in the above code.
 
 ```{.python .input n=45}
-ex = relax.build(MyModuleWithParams2, target="llvm")
+target = tvm.target.Target("llvm", host="llvm")
+ex = tvm.compile(MyModuleWithParams2, target)
 vm = relax.VirtualMachine(ex, tvm.cpu())
 
 nd_res = vm["main"](data_nd)

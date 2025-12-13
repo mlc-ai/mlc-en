@@ -22,7 +22,7 @@ To get you familiar with the process of building and manipulating an end-to-end 
 We first use the following commands to install necessary packages.
 
 ```python
-!python3 -m pip install mlc-ai-nightly -f https://mlc.ai/wheels
+!python3 -m pip install --pre -U -f https://mlc.ai/wheels mlc-ai-nightly-cpu
 !python3 -m pip install torch torchvision torchaudio torchsummary --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 
@@ -39,7 +39,7 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torchvision import transforms
 from tvm import topi, relax, te
-from tvm.script import tir as T
+from tvm.script import tir as T, relax as R
 
 ```
 
@@ -150,7 +150,7 @@ The signature of `emit_te` is `emit_te(func, *input)`, where `func` is a functio
 
 Let's start with an introducing example. In the code block below, `relu` is a function that returns a Tensor Expression description of a ReLU operator. To construct a Relax function that executes a single ReLU operator, in function `emit_te_example` we first define a BlockBuilder instance `bb`. We also define a 2-dimensional 128x128 tensor variable `x`, which will serve as the input tensor of the ReLU operation (as well as the input of the Relax function).
 
-After that, we construct a Relax function `main` with `x` as input, using the `with bb.function(name, [*input])` API. Then we construct a dataflow block. Inside the dataflow block, we first have a `call_tir` to a TensorIR implementation of ReLU operator, through `emit_te`. The `emit_te` below generates a TensorIR function called "`relu`" in the IRModule, and add a `call_tir(relu, (x,), (128, 128), dtype="float32")` operation in the dataflow block. And the `call_tir` is followed by a function return.
+After that, we construct a Relax function `main` with `x` as input, using the `with bb.function(name, [*input])` API. Then we construct a dataflow block. Inside the dataflow block, we first have a `call_tir` to a TensorIR implementation of ReLU operator, through `emit_te`. The `emit_te` below generates a TensorIR function called "`relu`" in the IRModule, and add a `call_tir(relu, (x,), out_sinfo=R.Tensor((128, 128), dtype="float32"))` operation in the dataflow block. And the `call_tir` is followed by a function return.
 
 After this construction, the BlockBuilder `bb` contains the constructed IRModule, which can be got by `bb.get()`.
 
@@ -163,7 +163,7 @@ def relu(A):
 
 def emit_te_example():
     bb = relax.BlockBuilder()
-    x = relax.Var("x", (128, 128), relax.DynTensorType(2, "float32"))
+    x = relax.Var("x", relax.TensorStructInfo((128, 128), "float32"))
     with bb.function("main", [x]):
         with bb.dataflow():
             lv0 = bb.emit_te(relu, x)
@@ -192,7 +192,7 @@ Note that each Conv2d layer or linear layer in the model contains a bias add, wh
 ```python
 def create_model_via_emit_te():
     bb = relax.BlockBuilder()
-    x = relax.Var("x", input_shape, relax.DynTensorType(batch_size, "float32"))
+    x = relax.Var("x", relax.TensorStructInfo(input_shape, "float32"))
 
     conv2d_weight = relax.const(weight_map["conv2d_weight"], "float32")
     conv2d_bias = relax.const(weight_map["conv2d_bias"].reshape(1, 32, 1, 1), "float32")
@@ -211,7 +211,8 @@ def create_model_via_emit_te():
 
 
 def build_mod(mod):
-    exec = relax.vm.build(mod, "llvm")
+    target = tvm.target.Target("llvm", host="llvm")
+    exec = tvm.compile(mod, target)
     dev = tvm.cpu()
     vm = relax.VirtualMachine(exec, dev)
     return vm
@@ -224,7 +225,7 @@ def check_equivalence(mod, torch_model, test_loader):
         for data, label in test_loader:
             data, label = data.cpu(), label.cpu()
             output_from_pytorch = torch_model(data).numpy()
-            output_from_relax = rt_mod["main"](tvm.nd.array(data, tvm.cpu())).numpy()
+            output_from_relax = rt_mod["main"](tvm.runtime.tensor(data.numpy())).numpy()
             tvm.testing.assert_allclose(output_from_pytorch, output_from_relax, rtol=1e-4)
 
 
@@ -252,11 +253,11 @@ As we have talked about in Lecture 4, we can integrate torch functions into an I
 Here is an example of using torch matmul and torch add to implement a linear layer. You can also find this example in the Lecture 4 notes.
 
 ```python
-@tvm.register_func("env.linear", override=True)
-def torch_linear(x: tvm.nd.NDArray,
-                 w: tvm.nd.NDArray,
-                 b: tvm.nd.NDArray,
-                 out: tvm.nd.NDArray):
+@tvm.register_global_func("env.linear", override=True)
+def torch_linear(x: tvm.runtime.Tensor,
+                 w: tvm.runtime.Tensor,
+                 b: tvm.runtime.Tensor,
+                 out: tvm.runtime.Tensor):
     x_torch = torch.from_dlpack(x)
     w_torch = torch.from_dlpack(w)
     b_torch = torch.from_dlpack(b)
@@ -273,7 +274,7 @@ class MyModuleWithExternCall:
              b0: Tensor((128,), "float32")):
         # block 0
         with R.dataflow():
-            lv0 = R.call_tir("env.linear", (x, w0, b0), (1, 128), dtype="float32")
+            lv0 = R.call_tir("env.linear", (x, w0, b0), out_sinfo=R.Tensor((1, 128), dtype="float32"))
             ...
         return ...
 ```
@@ -288,7 +289,7 @@ You may use `BlockBuilder.emit` to directly add a `call_tir` operation to the en
 def create_model_with_torch_func():
     bb = relax.BlockBuilder()
 
-    x = relax.Var("x", input_shape, relax.DynTensorType(4, "float32"))
+    x = relax.Var("x", relax.TensorStructInfo(input_shape, "float32"))
 
     conv2d_weight = relax.const(weight_map["conv2d_weight"], "float32")
     conv2d_bias = relax.const(weight_map["conv2d_bias"].reshape(1, 32, 1, 1), "float32")
@@ -372,7 +373,7 @@ Now we first create a schedule for the IRModule, and then transform the conv2d T
 
 ```python
 @T.prim_func
-def target_func(rxplaceholder: T.Buffer[(4, 1, 28, 28), "float32"], rxplaceholder_1: T.Buffer[(32, 1, 3, 3), "float32"], conv2d_nchw: T.Buffer[(4, 32, 26, 26), "float32"]) -> None:
+def target_func(rxplaceholder: T.Buffer((4, 1, 28, 28), "float32"), rxplaceholder_1: T.Buffer((32, 1, 3, 3), "float32"), conv2d_nchw: T.Buffer((4, 32, 26, 26), "float32")) -> None:
     T.func_attr({"global_symbol": "conv2d", "tir.noalias": True})
     # body
     # with T.block("root")

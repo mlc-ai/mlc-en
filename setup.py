@@ -11,7 +11,7 @@ requirements = [
     'torch',
     'torchvision',
     'torchsummary',
-    'xgboost==1.5',
+    'xgboost>=2.1.0',
     'tabulate',
 ]
 

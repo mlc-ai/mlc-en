@@ -272,9 +272,9 @@ Let us define the overall high-level translation logic. The main flow is as foll
 
 ```{.python .input}
 def map_param(param: nn.Parameter):
-    return relax.const(
-        param.data.cpu().numpy(), relax.TensorStructInfo(param.data.shape, "float32")
-    )
+    t = param.detach() if hasattr(param, "detach") else param
+    arr = t.cpu().numpy().astype("float32")
+    return relax.const(arr, "float32")
 
 def fetch_attr(fx_mod, target: str):
     """Helper function to fetch an attr"""

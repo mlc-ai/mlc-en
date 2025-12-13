@@ -312,14 +312,19 @@ So far, we have been manually writing transformations to optimize the TensorIR p
 ```python
 from tvm import meta_schedule as ms
 
-database = ms.tune_tir(
-    mod=MyModuleMatmul,
-    target="nvidia/tesla-p100",
-    max_trials_global=64,
-    num_trials_per_iter=64,
-    work_dir="./tune_tmp",
-)
-sch = ms.tir_integration.compile_tir(database, MyModuleMatmul, "nvidia/tesla-p100")
+database = ms.tune.tune_tasks(
+        tasks=[ms.tune_context.TuneContext(
+            mod=MyModuleMatmul,
+            target="nvidia/geforce-rtx-4090",
+            space_generator=ms.space_generator.PostOrderApply(),
+            search_strategy=ms.search_strategy.ReplayTrace(),
+            )],
+        task_weights=[1.0],
+        max_trials_global=64,
+        num_trials_per_iter=64,
+        work_dir="./tune_tmp",
+        )
+sch = ms.tir_integration.compile_tir(database, MyModuleMatmul, "nvidia/geforce-rtx-4090")
 sch.mod.show()
 ```
 

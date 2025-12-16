@@ -41,8 +41,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.MLC_GITHUB_TOKEN }}
       run: |
-        git clone https://$GITHUB_TOKEN@github.com/mlc-ai/mlc-ai.github.io
-        cd mlc-ai.github.io
+        git clone https://$GITHUB_TOKEN@github.com/mlc-ai/book-en
+        cd book-en
         git config user.name mlc-bot
         git config user.email 106439794+mlc-bot@users.noreply.github.com
         cd ..
@@ -51,4 +51,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.MLC_GITHUB_TOKEN }}
       run: |
-        python static/update_site.py --site-path mlc-ai.github.io --source-path _build/html
+        python static/update_site.py --site-path book-en --source-path _build/html

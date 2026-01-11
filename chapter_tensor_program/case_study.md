@@ -10,7 +10,7 @@ python -m pip install --pre -U -f https://mlc.ai/wheels mlc-ai-nightly-cpu
 
 ### Prelude
 
-![](../img/tensor_func_linear_relu.png)
+![Linear ReLU transformation](../img/tensor_func_linear_relu.png)
 
 To begin today's lecture, let us recap the key principle of the MLC process. Most of the MLC process can be viewed as transformation among tensor functions. The main thing we aim to answer in our following up are:
 
@@ -120,7 +120,7 @@ class MyModule:
 
 It is helpful to be able to see the numpy code and the TensorIR code side-by-side and check the corresponding elements, and we are going to walk through each of them in detail.
 
-![](../img/tensor_func_and_numpy.png)
+![TensorIR vs NumPy](../img/tensor_func_and_numpy.png)
 
 Let us first start by reviewing elements that have a direct correspondence between the numpy and TensorIR side. Then we will come back and review additional elements that are not part of the numpy program.
 
@@ -212,7 +212,7 @@ Let us walk through those property one by one.  First of all, in terms of the bo
 Let us now start to take a closer look at the block axis properties. These axis properties marks the relation of the axis to the computation being performed.
 The figure below summarizes the block (iteration) axes and the read write relations of block Y. Note that strictly speaking the block is doing (reduction) updates to `Y`, we mark this as write for now as we don't need value of `Y` from another block.
 
-![](../img/tensor_ir_block_axis.png)
+![TensorIR block axis](../img/tensor_ir_block_axis.png)
 
 In our example, block Y computes the result `Y[vi, vj]` by reading values from `A[vi, vk]` and `B[vk, vj]` and perform sum over all possible `vk`. In this particular example, if we fix `vi`, `vj` to be `(0, 1)`, and run the block for `vk in range(0, 128)`, we can effectively compute `C[0, 1]` independently from other possible locations (that have different values of vi, vj).
 
@@ -525,14 +525,14 @@ IPython.display.Code(MyModule.script(), language="python")
 IPython.display.Code(sch.mod.script(), language="python")
 ```
 
-![](../img/cpu_arch.png)
+![Memory hierarchy in computer architecture](../img/cpu_arch.png)
 
 To see why different loop variants result in different performances, we need to review the fact that it is not uniformly fast to access any piece of memory in `A` and `B`. Modern CPU comes with multiple levels of caches, where data needs to be fetched into the cache before the CPU can access it.
 
 Importantly, it is much faster to access the data already in the cache. One strategy that CPU takes is to fetch data closer to each other. When we read one element in the memory, it will attempt to fetch the elements close by (formally known as cache-line) to the cache. So when you read the next element, it is already in the cache. As a result, code with continuous memory access is usually faster than code that randomly accesses different parts of the memory.
 
 
-![](../img/tensor_func_loop_order.png)
+![Tensor function loop order](../img/tensor_func_loop_order.png)
 
 Now let us look at the above visualization of iterations and analyze what is going on.
 In this analysis, let us focus on two inner-most loops: `k` and `j1`. The highlighted cover shows the corresponding region in `Y`, `A` and `B` that the iteration touches when we iterate over `j1` for one specific instance of `k`.
@@ -615,7 +615,7 @@ In practice, we also get TensorIR functions as results of transformations. This 
 
 In this section, let us review what we learned so far. We learned that a common MLC process follows a sequence of program transformations. It is interesting to compare the TensorIR transformation process to the low-level numpy reference development process.
 
-![](../img/standard_process.png)
+![Standard development process](../img/standard_process.png)
 
 The above figure shows the standard development process. We need to repeat the process of developing different program variants and then (build if it is a compiled language) run them on the platform of interest.
 
@@ -623,7 +623,7 @@ The key difference in an MLC process(shown in the figure below) is the programma
 
 Transformation is a very powerful tool that helps us simplify development costs and introduce more automation to the process. This section covered a specific perspective on primitive tensor functions via TensorIR, and we will cover more perspectives in the future.
 
-![](../img/mlc_process.png)
+![MLC process](../img/mlc_process.png)
 
 
 Notably, direct code development and transformations are equally important in practice: We can still leverage a lot of domain expertise to develop and optimize part of the programs and then combine that with transformation-based approaches. We will talk about how to combine the two practices in future chapters.

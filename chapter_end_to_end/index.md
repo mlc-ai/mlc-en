@@ -2,7 +2,7 @@
 
 ## Prelude
 
-![](../img/tensor_func_linear_relu.png)
+![Linear ReLU transformation](../img/tensor_func_linear_relu.png)
 
 Most of the MLC process can be viewed as transformation among tensor functions. The main thing we aim to answer in our following up are:
 
@@ -69,7 +69,7 @@ print("Class:", class_names[label[0]])
 
 In this chapter, we will use the following model as an example. This is a two-layer neural network that consists of two linear operations with relu activation. To keep things simple, we removed the final softmax layer. The output score is un-normalized, but still, the maximum value corresponds to the most likely class.
 
-![](../img/e2e_fashionmnist_mlp_model.png)
+![FashionMNIST MLP model](../img/e2e_fashionmnist_mlp_model.png)
 
 Let us begin by reviewing a Numpy implementation of the model.
 
@@ -221,11 +221,11 @@ The above code contains kinds of functions: the primitive tensor functions (`T.p
 
 Again it is helpful to see the TVMScript code and low-level numpy code side-by-side and check the corresponding elements, and we are going to walk through each of them in detail. Since we already learned about primitive tensor functions, we are going to focus on the high-level execution part.
 
-![](../img/e2e_compare_to_lnumpy.png)
+![TVMScript vs low-level NumPy](../img/e2e_compare_to_lnumpy.png)
 
 ### Computational Graph View
 
-![](../img/e2e_computational_graph_call_tir.png)
+![TensorIR computational graph](../img/e2e_computational_graph_call_tir.png)
 
 It is usually helpful to use graph to visualize high-level model executions. The above figure is a graph-view of the `main` function:
 
@@ -279,7 +279,7 @@ def lnumpy_mlp(data, w0, b0, w1, b1):
     return out
 ```
 
-![](../img/e2e_computational_graph_numpy.png)
+![NumPy computational graph](../img/e2e_computational_graph_numpy.png)
 
 We can certainly try a bit :) The above figure is one possible "failed attempt" to fit the `lnumpy_mlp` into a "computational graph-like" form by simply connecting function inputs to the function.
 
@@ -589,7 +589,7 @@ In this chapter, we have discussed many ways to describe the end-to-end model ex
 
 So far, we have touched on a few ways to transform the end-to-end IRModule (e.g. parameter binding). Let us come back to the following common theme of MLC: MLC process is about representing the execution in possibly different abstractions and transforming among them.
 
-![](../img/mlc_process.png)
+![MLC process](../img/mlc_process.png)
 
 There are many possible transformations in the end-to-end execution. For example, we can take the TensorIR function in MyModuleMixture and change the `linear0` function using the schedule operations taught in the last lecture. In other instances, we might want to transform high-level model executions into a mixture of library function calls and TensorIR functions.
 

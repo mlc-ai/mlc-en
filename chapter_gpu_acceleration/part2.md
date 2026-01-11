@@ -16,7 +16,7 @@ import numpy as np
 
 ### Hardware Specialization Trend
 
-![](../img/hardware_specialization.png)
+![Hardware Specialization Trend](../img/hardware_specialization.png)
 
 If we look at the machine learning hardware landscape, one emerging theme recently is specialization. Traditionally, we build our solutions on generic scalar processors, where we can perform operations on one floating point at a time. The vector instructions set such as AVX and ARM/Neon provide effective ways to speed up our programs but also bring some complexities to how we write the programs.
 
@@ -52,7 +52,7 @@ def lnumpy_tmm(A: np.ndarray, B: np.ndarray, C: np.ndarray):
             accel_dma_copy(C[i * 16 : i * 16 + 16, j * 16 : j * 16 + 16], C_accumulator[:,:])
 ```
 
-![](../img/hardware_specialization_abc.png)
+![Data flow across specialized hardware memory regions](../img/hardware_specialization_abc.png)
 
 The above low-level NumPy program contains the following key elements:
 
@@ -205,7 +205,7 @@ sch.reverse_compute_at(write_back_block, j)
 sch.mod.show()
 ```
 
-![](../img/hardware_specialization_abc.png)
+![Data flow across specialized hardware memory regions](../img/hardware_specialization_abc.png)
 
 Here `global.A_reg` contains two parts. `global` indicates that all threads can globally access the memory, and `A_reg` is a **scope tag** of the memory, which provides opportunities for follow-up compilation to map it to special regions such as registers.
 

@@ -155,7 +155,7 @@ MyModule.show()
 
 Now let us do a deep dive into each block builder API. It is helpful to put the block builder code and the resulting module side by side.
 
-![](../img/integration_block_builder.png)
+![Block builder code and the resulting module](../img/integration_block_builder.png)
 
 The block builder comes with scopes that correspond to the scopes in the relax function. For example, `bb.dataflow()` creates a dataflow
 block where all the block builder calls inside the scope belonging to the dataflow scope.
@@ -385,7 +385,7 @@ print("Class:", class_names[label[0]])
 !wget -nc https://github.com/mlc-ai/web-data/raw/main/models/fasionmnist_mlp_params.pkl
 ```
 
-![](../img/e2e_fashionmnist_mlp_model.png)
+![FashionMNIST MLP model](../img/e2e_fashionmnist_mlp_model.png)
 
 The above is our model of interest, we can build the PyTorch model as follows.
 
@@ -508,7 +508,7 @@ In this chapter, we focus on the **develop** part of the MLC flow. We studied di
 
 Once we get the model into the IRModule, we can introduce more kinds of transformations on primitive functions and computational graph functions. A good MLC process composes these transformations together to form an end deployment form.
 
-![](../img/mlc_process.png)
+![MLC process](../img/mlc_process.png)
 
 ## Summary
 

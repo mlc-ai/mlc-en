@@ -145,7 +145,7 @@ def stochastic_schedule_mm(sch: tvm.tir.Schedule):
     return sch
 ```
 
-![](../img/auto_prog_optim_stoch_sch_transformation.png)
+![`stochastic_schedule_mm` vs `schedule_mm`](../img/auto_prog_optim_stoch_sch_transformation.png)
 
 Let us compare `stochastic_schedule_mm` and `schedule_mm` side by side. We can find that the only difference is how to specify `j_factors`. In the case of `schedule_mm`, `j_factors` is passed in as a parameter specified by us. In the case of `stochastic_schedule_mm`, it comes from `sch.sample_perfect_tile`.
 
@@ -244,7 +244,7 @@ IPython.display.HTML(code2html(sch.mod.script()))
 
 One thing that you might realize is that `stochastic_schedule_mm` create a **search space of possible programs** depending on the specific decisions made at each sampling step.
 
-![](../img/auto_prog_optim_transformation_search.png)
+![Stochastic transformation search](../img/auto_prog_optim_transformation_search.png)
 
 Coming back to our initial intuition, we want to be able to specify a set of **possible programs**  instead of one program. `stochastic_schedule_mm` did exactly that. Of course, one natural question to ask next is what is the best choice.
 
@@ -410,7 +410,7 @@ We also download pre-packed model parameters that we will use in our examples.
 !wget -nc https://github.com/mlc-ai/web-data/raw/main/models/fasionmnist_mlp_params.pkl
 ```
 
-![](../img/e2e_fashionmnist_mlp_model.png)
+![FashionMNIST MLP model](../img/e2e_fashionmnist_mlp_model.png)
 
 As a reminder, the above figure shows the model of interest.
 
@@ -508,7 +508,7 @@ print("MyModuleWithParams time-cost: %g ms" % (ftimer(data_nd).mean * 1000))
 
 We are now ready to tune the `linear0`. Our overall process is summarized in the following diagram.
 
-![](../img/auto_prog_optim_optim_flow.png)
+![Optimization flow](../img/auto_prog_optim_optim_flow.png)
 
 Currently, tune API only takes an IRModule with one `main` function, so we first get the `linear0` out into another module's main function and pass it to tune
 
@@ -567,7 +567,7 @@ Importantly, putting the search result back into the end-to-end flow is just a m
 
 So we again are following the generic MLC process in the figure below. In future lectures, we will introduce more kinds of transformations on primitive functions and computational graph functions. A good MLC process composes these transformations together to form an end deployment form.
 
-![](../img/mlc_process.png)
+![MLC process](../img/mlc_process.png)
 
 ## Summary
 

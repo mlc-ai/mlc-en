@@ -28,11 +28,11 @@ import numpy as np
 
 Let us begin by reviewing what a GPU architecture looks like. A typical GPU contains a collection of stream multi-processors, and each multi-processor has many cores. A GPU device is massively parallel and allows us to execute many tasks concurrently.
 
-![](../img/gpu_arch.png)
+![GPU Architecture](../img/gpu_arch.png)
 
 To program a GPU, we need to create a set of thread blocks, with each thread mapping to the cores and the thread block map to the stream multiprocessors.
 
-![](../img/gpu_stream_processors.png)
+![GPU stream processors](../img/gpu_stream_processors.png)
 
 Let us start GPU programming using a vector add example. The following TensorIR program takes two vectors, A and B, performs element-wise add, and stores the result in C.
 
@@ -64,7 +64,7 @@ sch.mod.show()
 
 Then we bind the iterators to the GPU thread blocks. Each thread is parameterized by two indices -- `threadIdx.x` and `blockIdx.x`. In practice, we can have multiple dimensional thread indices, but we keep them simple as one dimension.
 
-![](../img/gpu_thread_blocks.png)
+![GPU Thread Blocks](../img/gpu_thread_blocks.png)
 
 ```{.python .input}
 sch.bind(i0, "blockIdx.x")
@@ -95,7 +95,7 @@ print(C_nd)
 
 Now, let us move forward to another example -- window sum. This program can be viewed as a basic version of "convolution" with a predefined weight `[1,1,1]`. We are taking sliding over the input and add three neighboring values together.
 
-![](../img/window_sum.png)
+![Window sum](../img/window_sum.png)
 
 ```{.python .input}
 @tvm.script.ir_module
@@ -123,7 +123,7 @@ sch.bind(i1, "threadIdx.x")
 sch.mod.show()
 ```
 
-![](../img/gpu_stream_processors.png)
+![GPU stream processors](../img/gpu_stream_processors.png)
 
 Importantly, in this case, there are reuse opportunities. Remember that each GPU thread block contains shared memory that all threads can access within the block. We use `cache_read` to add an intermediate stage that caches segments (in green below) onto the shared memory. After the caching is finished, the threads can then read from the shared memory.
 
@@ -187,7 +187,7 @@ class MyModuleMatmul:
 
 #### Local Blocking
 
-![](../img/gpu_local_blocking.png)
+![GPU Local Blocking](../img/gpu_local_blocking.png)
 
 To increase overall memory reuse. We can tile the loops. In particular, we introduce local tiles such that we only need to load stripe of data from A and B once, then use them to perform a `V * V` matrix multiplication result.
 
@@ -243,7 +243,7 @@ print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean 
 
 ### Shared Memory Blocking
 
-![](../img/gpu_shared_blocking.png)
+![GPU Shared Memory Blocking](../img/gpu_shared_blocking.png)
 
 Our first attempt did not consider the neighboring threads which sit in the same GPU thread block, and we can load the data they commonly need into a piece of shared memory.
 

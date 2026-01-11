@@ -4,7 +4,7 @@
 
 Most of the MLC process can be viewed as transformation among tensor functions. In the past chapters, we studied how to transform each primitive tensor functions individually. In this chapter, let us talk about high-level transformations among computational graphs.
 
-![](../img/mlc-elem-transform.png)
+![Example MLC Process as Tensor Function Transformations.](../img/mlc-elem-transform.png)
 
 ## Preparations
 
@@ -101,7 +101,7 @@ And its value field corresponds to the right-hand side of the binding. Each valu
 binding.value
 ```
 
-![](../img/relax_func_data_structure.png)
+![`relax` function data structure](../img/relax_func_data_structure.png)
 
 The above figure summarizes the data structure involved in this particular function.
 
@@ -397,7 +397,7 @@ Real-world MLC process can contain more powerful and robust transformations. For
 
 Notably, each of these transformations is composable with each other. For example, we can choose to use our version of customized fusor to support additional new fusion patterns that we want to explore and then feed into an existing fusor to handle the rest of the steps.
 
-![](../img/mlc_process.png)
+![MLC process](../img/mlc_process.png)
 
 ## Summary
 

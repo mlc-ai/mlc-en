@@ -39,7 +39,7 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torchvision import transforms
 from tvm import topi, relax, te
-from tvm.script import tir as T, relax as R
+from tvm.script import tirx as T, relax as R
 
 ```
 
@@ -330,17 +330,17 @@ def before_inline(a: T.handle, c: T.handle) -> None:
     B = T.alloc_buffer((128, 128))
     C = T.match_buffer(c, (128, 128))
     for i, j in T.grid(128, 128):
-        with T.block("B"):
+        with T.sblock("B"):
             vi, vj = T.axis.remap("SS", [i, j])
             B[vi, vj] = A[vi, vj] * 2.0
     for i, j in T.grid(128, 128):
-        with T.block("C"):
+        with T.sblock("C"):
             vi, vj = T.axis.remap("SS", [i, j])
             C[vi, vj] = B[vi, vj] + 1.0
 
 
-sch = tvm.tir.Schedule(before_inline)
-sch.compute_inline(sch.get_block("B"))
+sch = tvm.s_tir.Schedule(before_inline)
+sch.compute_inline(sch.get_sblock("B"))
 IPython.display.Code(sch.mod["main"].script(), language="python")
 
 ```
@@ -351,13 +351,13 @@ def before_fuse(a: T.handle, b: T.handle) -> None:
     A = T.match_buffer(a, (128, 128))
     B = T.match_buffer(b, (128, 128))
     for i, j in T.grid(128, 128):
-        with T.block("B"):
+        with T.sblock("B"):
             vi, vj = T.axis.remap("SS", [i, j])
             B[vi, vj] = A[vi, vj] * 2.0
 
 
-sch = tvm.tir.Schedule(before_fuse)
-i, j = sch.get_loops(sch.get_block("B"))
+sch = tvm.s_tir.Schedule(before_fuse)
+i, j = sch.get_loops(sch.get_sblock("B"))
 sch.fuse(i, j)
 IPython.display.Code(sch.mod["main"].script(), language="python")
 
@@ -374,13 +374,13 @@ Now we first create a schedule for the IRModule, and then transform the conv2d T
 ```python
 @T.prim_func
 def target_func(rxplaceholder: T.Buffer((4, 1, 28, 28), "float32"), rxplaceholder_1: T.Buffer((32, 1, 3, 3), "float32"), conv2d_nchw: T.Buffer((4, 32, 26, 26), "float32")) -> None:
-    T.func_attr({"global_symbol": "conv2d", "tir.noalias": True})
+    T.func_attr({"global_symbol": "conv2d", "tirx.noalias": True})
     # body
-    # with T.block("root")
+    # with T.sblock("root")
     for i0_0_i1_0_i2_0_i3_0_fused in T.parallel(2704):
         for i0_1_i1_1_fused_init in T.unroll(8):
             for i2_1_i3_1_fused_init in T.vectorized(4):
-                with T.block("conv2d_nchw_init"):
+                with T.sblock("conv2d_nchw_init"):
                     nn = T.axis.spatial(
                         4, i0_0_i1_0_i2_0_i3_0_fused // 1352 * 2 + i0_1_i1_1_fused_init // 4)
                     ff = T.axis.spatial(
@@ -395,7 +395,7 @@ def target_func(rxplaceholder: T.Buffer((4, 1, 28, 28), "float32"), rxplaceholde
         for i4, i5, i6 in T.grid(1, 3, 3):
             for i0_1_i1_1_fused in T.unroll(8):
                 for i2_1_i3_1_fused in T.vectorized(4):
-                    with T.block("conv2d_nchw_update"):
+                    with T.sblock("conv2d_nchw_update"):
                         nn = T.axis.spatial(
                             4, i0_0_i1_0_i2_0_i3_0_fused // 1352 * 2 + i0_1_i1_1_fused // 4)
                         ff = T.axis.spatial(
@@ -418,10 +418,10 @@ Unlike Exercise 1, this time the schedule is created for an IRModule, instead of
 
 ```python
 mod = create_model_via_emit_te()
-sch = tvm.tir.Schedule(mod)
+sch = tvm.s_tir.Schedule(mod)
 # TODO
 # Step 1. Get blocks
-# block = sch.get_block(name="your_block_name", func_name="your_function_name")
+# block = sch.get_sblock(name="your_block_name", func_name="your_function_name")
 
 # Step 2. Inline the padding block (if exists)
 

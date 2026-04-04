@@ -13,7 +13,7 @@ To begin with, we will import necessary dependencies.
 ```{.python .input}
 import tvm
 from tvm.ir.module import IRModule
-from tvm.script import tir as T, relax as R
+from tvm.script import tirx as T, relax as R
 from tvm import relax
 import numpy as np
 ```

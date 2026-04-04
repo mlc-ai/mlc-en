@@ -19,7 +19,7 @@ To begin with, let us import the necessary dependencies.
 ```{.python .input}
 import tvm
 from tvm.ir.module import IRModule
-from tvm.script import tir as T, relax as R
+from tvm.script import tirx as T, relax as R
 from tvm import relax
 import numpy as np
 ```
@@ -43,9 +43,9 @@ class MyModuleVecAdd:
     def main(A: T.Buffer((1024,), "float32"),
              B: T.Buffer((1024,), "float32"),
              C: T.Buffer((1024,), "float32")) -> None:
-        T.func_attr({"global_symbol": "main", "tir.noalias": True})
+        T.func_attr({"global_symbol": "main", "tirx.noalias": True})
         for i in T.grid(1024):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi = T.axis.remap("S", [i])
                 C[vi] = A[vi] + B[vi]
 ```
@@ -53,8 +53,8 @@ class MyModuleVecAdd:
 We first split loop `i` into two loops.
 
 ```{.python .input}
-sch = tvm.tir.Schedule(MyModuleVecAdd)
-block_C = sch.get_block("C")
+sch = tvm.s_tir.Schedule(MyModuleVecAdd)
+block_C = sch.get_sblock("C")
 i, = sch.get_loops(block=block_C)
 i0, i1 = sch.split(i, [None, 128])
 sch.mod.show()
@@ -103,9 +103,9 @@ class MyModuleWindowSum:
     @T.prim_func
     def main(A: T.Buffer((1027,), "float32"),
              B: T.Buffer((1024,), "float32")) -> None:
-        T.func_attr({"global_symbol": "main", "tir.noalias": True})
+        T.func_attr({"global_symbol": "main", "tirx.noalias": True})
         for i in T.grid(1024):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi = T.axis.remap("S", [i])
                 B[vi] = A[vi] + A[vi + 1] + A[vi + 2]
 ```
@@ -113,9 +113,9 @@ class MyModuleWindowSum:
 First, we can bind the loop to GPU threads.
 
 ```{.python .input}
-sch = tvm.tir.Schedule(MyModuleWindowSum)
+sch = tvm.s_tir.Schedule(MyModuleWindowSum)
 nthread = 128
-block_C = sch.get_block("C")
+block_C = sch.get_sblock("C")
 i,  = sch.get_loops(block=block_C)
 i0, i1 = sch.split(i, [None, nthread])
 sch.bind(i0, "blockIdx.x")
@@ -176,9 +176,9 @@ class MyModuleMatmul:
     def main(A: T.Buffer((1024, 1024), "float32"),
              B: T.Buffer((1024, 1024), "float32"),
              C: T.Buffer((1024, 1024), "float32")) -> None:
-        T.func_attr({"global_symbol": "main", "tir.noalias": True})
+        T.func_attr({"global_symbol": "main", "tirx.noalias": True})
         for i, j, k in T.grid(1024, 1024, 1024):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     C[vi, vj] = 0.0
@@ -200,7 +200,7 @@ def blocking(sch,
              tile_block_y,
              tile_block_x,
              tile_k):
-    block_C = sch.get_block("C")
+    block_C = sch.get_sblock("C")
     C_local = sch.cache_write(block_C, 0, "local")
 
     i, j, k = sch.get_loops(block=block_C)
@@ -221,7 +221,7 @@ def blocking(sch,
 
     return sch
 
-sch = tvm.tir.Schedule(MyModuleMatmul)
+sch = tvm.s_tir.Schedule(MyModuleMatmul)
 sch = blocking(sch, 8, 8, 8, 8, 4)
 sch.mod.show()
 ```
@@ -268,7 +268,7 @@ def blocking_with_shared(
     tile_block_y,
     tile_block_x,
     tile_k):
-    block_C = sch.get_block("C")
+    block_C = sch.get_sblock("C")
     C_local = sch.cache_write(block_C, 0, "local")
 
     i, j, k = sch.get_loops(block=block_C)
@@ -292,7 +292,7 @@ def blocking_with_shared(
 
     return sch
 
-sch = tvm.tir.Schedule(MyModuleMatmul)
+sch = tvm.s_tir.Schedule(MyModuleMatmul)
 sch = blocking_with_shared(sch, 8, 8, 8, 8, 8)
 sch.mod.show()
 ```
@@ -310,7 +310,7 @@ print("GEMM-Blocking: %f GFLOPS" % (num_flop / evaluator(A_nd, B_nd, C_nd).mean 
 So far, we have been manually writing transformations to optimize the TensorIR program on GPU. We can leverage the automatic program optimization framework to tune the same program. The following code does that, we only set a small number here, and it can take a few min to finish.
 
 ```python
-from tvm import meta_schedule as ms
+from tvm.s_tir import meta_schedule as ms
 
 database = ms.tune_tir(
     mod=MyModuleMatmul,

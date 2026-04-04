@@ -28,7 +28,7 @@ Now we are ready to learn one specific instance of tensor program abstraction ca
 ```{.python .input n=0}
 import tvm
 from tvm.ir.module import IRModule
-from tvm.script import tir as T
+from tvm.script import tirx as T
 import numpy as np
 ```
 
@@ -101,10 +101,10 @@ class MyModule:
     def mm_relu(A: T.Buffer((128, 128), "float32"),
                 B: T.Buffer((128, 128), "float32"),
                 C: T.Buffer((128, 128), "float32")):
-        T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
+        T.func_attr({"global_symbol": "mm_relu", "tirx.noalias": True})
         Y = T.alloc_buffer((128, 128), dtype="float32")
         for i, j, k in T.grid(128, 128, 128):
-            with T.block("Y"):
+            with T.sblock("Y"):
                 vi = T.axis.spatial(128, i)
                 vj = T.axis.spatial(128, j)
                 vk = T.axis.reduce(128, k)
@@ -112,7 +112,7 @@ class MyModule:
                     Y[vi, vj] = T.float32(0)
                 Y[vi, vj] = Y[vi, vj] + A[vi, vk] * B[vk, vj]
         for i, j in T.grid(128, 128):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi = T.axis.spatial(128, i)
                 vj = T.axis.spatial(128, j)
                 C[vi, vj] = T.max(Y[vi, vj], T.float32(0))
@@ -166,11 +166,11 @@ for i in range(128):
 
 #### Computational Block
 
-One of the main differences comes from the computational statement. TensorIR contains an additional construct called `T.block`.
+One of the main differences comes from the computational statement. TensorIR contains an additional construct called `T.sblock`.
 
 ```python
 # TensorIR
-with T.block("Y"):
+with T.sblock("Y"):
     vi = T.axis.spatial(128, i)
     vj = T.axis.spatial(128, j)
     vk = T.axis.reduce(128, k)
@@ -228,7 +228,7 @@ The block axis information also provides additional properties that help us vali
 ```python
 # wrong program due to loop and block iteration mismatch
 for i in range(127):
-    with T.block("C"):
+    with T.sblock("C"):
         vi = T.axis.spatial(128, i)
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
         error here due to iterator size mismatch
@@ -261,16 +261,16 @@ class MyModuleWithAxisRemapSugar:
     def mm_relu(A: T.Buffer((128, 128), "float32"),
                 B: T.Buffer((128, 128), "float32"),
                 C: T.Buffer((128, 128), "float32")):
-        T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
+        T.func_attr({"global_symbol": "mm_relu", "tirx.noalias": True})
         Y = T.alloc_buffer((128, 128), dtype="float32")
         for i, j, k in T.grid(128, 128, 128):
-            with T.block("Y"):
+            with T.sblock("Y"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     Y[vi, vj] = T.float32(0)
                 Y[vi, vj] = Y[vi, vj] + A[vi, vk] * B[vk, vj]
         for i, j in T.grid(128, 128):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi, vj = T.axis.remap("SS", [i, j])
                 C[vi, vj] = T.max(Y[vi, vj], T.float32(0))
 ```
@@ -282,7 +282,7 @@ So far, we have covered most of the elements in TensorIR. In this part, we will 
 The function attribute information contains extra information about the function.
 
 ```python
-T.func_attr({"global_symbol": "mm_relu", "tir.noalias": True})
+T.func_attr({"global_symbol": "mm_relu", "tirx.noalias": True})
 ```
 
 Here `global_symbol` corresponds to the name of the function, and `tir.noalias` is an attribute indicating that all the buffer memory areas do not overlap. You also feel free safely skip these attributes for now as they won't affect the overall understanding of the high-level concepts.
@@ -309,9 +309,9 @@ class MyModuleWithTwoFunctions:
     def mm(A: T.Buffer((128, 128), "float32"),
            B: T.Buffer((128, 128), "float32"),
            Y: T.Buffer((128, 128), "float32")):
-        T.func_attr({"global_symbol": "mm", "tir.noalias": True})
+        T.func_attr({"global_symbol": "mm", "tirx.noalias": True})
         for i, j, k in T.grid(128, 128, 128):
-            with T.block("Y"):
+            with T.sblock("Y"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     Y[vi, vj] = T.float32(0)
@@ -320,9 +320,9 @@ class MyModuleWithTwoFunctions:
     @T.prim_func
     def relu(A: T.Buffer((128, 128), "float32"),
              B: T.Buffer((128, 128), "float32")):
-        T.func_attr({"global_symbol": "relu", "tir.noalias": True})
+        T.func_attr({"global_symbol": "relu", "tirx.noalias": True})
         for i, j in T.grid(128, 128):
-            with T.block("B"):
+            with T.sblock("B"):
                 vi, vj = T.axis.remap("SS", [i, j])
                 B[vi, vj] = T.max(A[vi, vj], T.float32(0))
 ```
@@ -384,13 +384,13 @@ IPython.display.Code(MyModule.script(), language="python")
 Now we are ready to try out the code transformations, we begin by creating a `Schedule` helper class with the given MyModule as input.
 
 ```{.python .input n=11}
-sch = tvm.tir.Schedule(MyModuleWithAxisRemapSugar)
+sch = tvm.s_tir.Schedule(MyModuleWithAxisRemapSugar)
 ```
 
 Then we perform the following operations to obtain a reference to block Y and corresponding loops.
 
 ```{.python .input n=12}
-block_Y = sch.get_block("Y", func_name="mm_relu")
+block_Y = sch.get_sblock("Y", func_name="mm_relu")
 i, j, k = sch.get_loops(block_Y)
 ```
 
@@ -421,7 +421,7 @@ In this section, we are going to go ahead and do another two steps of transforma
 `reverse_compute_at` to move block C to an inner loop of `Y`.
 
 ```{.python .input n=16}
-block_C = sch.get_block("C", "mm_relu")
+block_C = sch.get_sblock("C", "mm_relu")
 sch.reverse_compute_at(block_C, j0)
 IPython.display.Code(sch.mod.script(), language="python")
 ```
@@ -546,12 +546,12 @@ As an exercise, try different `j_factor` choices and see how they affect the cod
 
 ```{.python .input n=25}
 def transform(mod, jfactor):
-    sch = tvm.tir.Schedule(mod)
-    block_Y = sch.get_block("Y", func_name="mm_relu")
+    sch = tvm.s_tir.Schedule(mod)
+    block_Y = sch.get_sblock("Y", func_name="mm_relu")
     i, j, k = sch.get_loops(block_Y)
     j0, j1 = sch.split(j, factors=[None, jfactor])
     sch.reorder(j0, k, j1)
-    block_C = sch.get_block("C", "mm_relu")
+    block_C = sch.get_sblock("C", "mm_relu")
     sch.reverse_compute_at(block_C, j0)
     return sch.mod
 

@@ -19,7 +19,7 @@ To begin with, we will import necessary dependencies and create helper functions
 ```{.python .input n=0}
 import tvm
 from tvm.ir.module import IRModule
-from tvm.script import tir as T, relax as R
+from tvm.script import tirx as T, relax as R
 import numpy as np
 from tvm import relax
 ```
@@ -50,9 +50,9 @@ class MyModule:
         B: T.Buffer((128, 128), "float32"),
         C: T.Buffer((128, 128), "float32"),
     ):
-        T.func_attr({"global_symbol": "main", "tir.noalias": True})
+        T.func_attr({"global_symbol": "main", "tirx.noalias": True})
         for i, j, k in T.grid(128, 128, 128):
-            with T.block("C"):
+            with T.sblock("C"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     C[vi, vj] = 0.0
@@ -83,8 +83,8 @@ print("Time cost of MyModule: %.3f ms" % (f_timer_before(a_nd, b_nd, c_nd).mean 
 Next, we transform `MyModule` a bit by reorganizing the loop access pattern.
 
 ```{.python .input n=5}
-def schedule_mm(sch: tvm.tir.Schedule, jfactor=4):
-    block_C = sch.get_block("C", "main")
+def schedule_mm(sch: tvm.s_tir.Schedule, jfactor=4):
+    block_C = sch.get_sblock("C", "main")
     i, j, k = sch.get_loops(block=block_C)
     j_0, j_1 = sch.split(loop=j, factors=[None, jfactor])
     sch.reorder(i, j_0, k, j_1)
@@ -93,7 +93,7 @@ def schedule_mm(sch: tvm.tir.Schedule, jfactor=4):
 ```
 
 ```{.python .input n=6}
-sch = tvm.tir.Schedule(MyModule)
+sch = tvm.s_tir.Schedule(MyModule)
 sch = schedule_mm(sch)
 IPython.display.HTML(code2html(sch.mod.script()))
 ```
@@ -115,8 +115,8 @@ print(sch.trace)
 ```
 
 ```{.python .input n=9}
-def schedule_mm(sch: tvm.tir.Schedule, jfactor=4):
-    block_C = sch.get_block("C", "main")
+def schedule_mm(sch: tvm.s_tir.Schedule, jfactor=4):
+    block_C = sch.get_sblock("C", "main")
     i, j, k = sch.get_loops(block=block_C)
     j_0, j_1 = sch.split(loop=j, factors=[None, jfactor])
     sch.reorder(i, j_0, k, j_1)
@@ -135,8 +135,8 @@ However, in practice, we may not be able to decide every detail accurately. Inst
 One natural way to achieve the goal is to add some stochastic (randomness) elements to our transformations. The following code does that.
 
 ```{.python .input n=10}
-def stochastic_schedule_mm(sch: tvm.tir.Schedule):
-    block_C = sch.get_block("C", "main")
+def stochastic_schedule_mm(sch: tvm.s_tir.Schedule):
+    block_C = sch.get_sblock("C", "main")
     i, j, k = sch.get_loops(block=block_C)
     j_factors = sch.sample_perfect_tile(loop=j, n=2)
     j_0, j_1 = sch.split(loop=j, factors=j_factors)
@@ -154,7 +154,7 @@ As the name suggests, `sch.sample_perfect_tile` tries to draw random numbers to 
 Let us first try to see what is the effect of `stochastic_schedule_mm` by running the following code-block. Try to run the following code block multiple times and observe the outcome difference. You might find that the loop bound of `j_1` changes each time we run the code-block.
 
 ```{.python .input n=11}
-sch = tvm.tir.Schedule(MyModule)
+sch = tvm.s_tir.Schedule(MyModule)
 sch = stochastic_schedule_mm(sch)
 
 IPython.display.HTML(code2html(sch.mod.script()))
@@ -171,7 +171,7 @@ When we look at the trace, pay close attention to the `decision=[...]` part of `
 As an alternative way to look at different samples of `stochastic_schedule_mm`, we can run the following block multiple times and look at the trace.
 
 ```{.python .input n=13}
-sch = tvm.tir.Schedule(MyModule)
+sch = tvm.s_tir.Schedule(MyModule)
 sch = stochastic_schedule_mm(sch)
 print(sch.trace)
 ```
@@ -186,8 +186,8 @@ Now let us take a deeper dive into what happened in stochastic schedule transfor
 Let us try to run the stochastic transformation step by step.
 
 ```{.python .input n=14}
-sch = tvm.tir.Schedule(MyModule)
-block_C = sch.get_block("C", "main")
+sch = tvm.s_tir.Schedule(MyModule)
+block_C = sch.get_sblock("C", "main")
 i, j, k = sch.get_loops(block=block_C)
 j_factors = sch.sample_perfect_tile(loop=j, n=2)
 ```
@@ -256,7 +256,7 @@ def random_search(mod: tvm.IRModule, num_trials=5):
     best_sch = None
 
     for i in range(num_trials):
-        sch = stochastic_schedule_mm(tvm.tir.Schedule(mod))
+        sch = stochastic_schedule_mm(tvm.s_tir.Schedule(mod))
         lib = tvm.compile(sch.mod, target="llvm")
         f_timer_after = lib.mod.time_evaluator("main", tvm.cpu())
         result = f_timer_after(a_nd, b_nd, c_nd).mean
@@ -291,18 +291,18 @@ In practice, we use smarter algorithms. We also need to provide additional utili
 Despite these magics, the key idea remains the same: **use stochastic transformation to specify a search space of good programs, `tune_tir` API helps to search and find an optimized solution within the search space**.
 
 ```{.python .input n=25}
-from tvm import meta_schedule as ms
+from tvm.s_tir import meta_schedule as ms
 
 database = ms.tune_tir(
     mod=MyModule,
-    target="llvm --num-cores=1",
+    target=tvm.target.Target({"kind": "llvm", "num-cores": 1}),
     max_trials_global=64,
     num_trials_per_iter=64,
     space=ms.space_generator.ScheduleFn(stochastic_schedule_mm),
     work_dir="./tune_tmp",
 )
 
-sch = ms.tir_integration.compile_tir(database, MyModule, "llvm --num-cores=1")
+sch = ms.tir_integration.compile_tir(database, MyModule, tvm.target.Target({"kind": "llvm", "num-cores": 1}))
 ```
 
 `tune_tir` functions return an optimized schedule found during the tuning process.
@@ -330,12 +330,12 @@ Under the hood, the meta-scheduler analyzes each block's data access and loop pa
 ```{.python .input n=29}
 database = ms.tune_tir(
     mod=MyModule,
-    target="llvm --num-cores=1",
+    target=tvm.target.Target({"kind": "llvm", "num-cores": 1}),
     max_trials_global=64,
     num_trials_per_iter=64,
     work_dir="./tune_tmp",
 )
-sch = ms.tir_integration.compile_tir(database, MyModule, "llvm --num-cores=1")
+sch = ms.tir_integration.compile_tir(database, MyModule, tvm.target.Target({"kind": "llvm", "num-cores": 1}))
 ```
 
 ```{.python .input n=30}
@@ -432,17 +432,17 @@ class MyModuleMixture:
                 W: T.Buffer((128, 784), "float32"), 
                 B: T.Buffer((128,), "float32"), 
                 Z: T.Buffer((1, 128), "float32")):
-        T.func_attr({"global_symbol": "linear0", "tir.noalias": True})
+        T.func_attr({"global_symbol": "linear0", "tirx.noalias": True})
         Y = T.alloc_buffer((1, 128), "float32")
         for i, j, k in T.grid(1, 128, 784):
-            with T.block("Y"):
+            with T.sblock("Y"):
                 vi, vj, vk = T.axis.remap("SSR", [i, j, k])
                 with T.init():
                     Y[vi, vj] = T.float32(0)
                 Y[vi, vj] = Y[vi, vj] + X[vi, vk] * W[vj, vk]
     
         for i, j in T.grid(1, 128):
-            with T.block("Z"):
+            with T.sblock("Z"):
                 vi, vj = T.axis.remap("SS", [i, j])
                 Z[vi, vj] =  Y[vi, vj] + B[vj]
 
@@ -520,12 +520,12 @@ IPython.display.HTML(code2html(mod_linear.script()))
 ```{.python .input n=43}
 database = ms.tune_tir(
     mod=mod_linear,
-    target="llvm --num-cores=1",
+    target=tvm.target.Target({"kind": "llvm", "num-cores": 1}),
     max_trials_global=64,
     num_trials_per_iter=64,
     work_dir="./tune_tmp",
 )
-sch = ms.tir_integration.compile_tir(database, mod_linear, "llvm --num-cores=1")
+sch = ms.tir_integration.compile_tir(database, mod_linear, tvm.target.Target({"kind": "llvm", "num-cores": 1}))
 ```
 
 Now we need to replace the original `linear0` with the new function after tuning. We can do that by first getting a `global_var`, a `pointer` reference to the functions inside the IRModule, then calling `update_func` to replace the function with the new one.

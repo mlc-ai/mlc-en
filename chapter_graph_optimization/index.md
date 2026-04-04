@@ -14,7 +14,7 @@ To begin with, let us import the necessary dependencies.
 # This is needed for deferring annotation parsing in TVMScript
 import tvm
 from tvm.ir.module import IRModule
-from tvm.script import tir as T, relax as R
+from tvm.script import tirx as T, relax as R
 from tvm import relax, topi
 import numpy as np
 ```

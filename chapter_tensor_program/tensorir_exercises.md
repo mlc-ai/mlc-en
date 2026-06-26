@@ -113,7 +113,7 @@ Here is the mathematical definition of convolution with NCHW layout:
 
 $$Conv[b, k, i, j] =
     \sum_{di, dj, q} A[b, q, strides * i + di, strides * j + dj] * W[k, q, di, dj]$$
-, where, `A` is the input tensor, `W` is the weight tensor, `b` is the batch index, `k` is the out channels, `i` and `j` are indices for image hight and width, `di` and `dj` are the indices of the weight, `q` is the input channel, and `strides` is the stride of the filter window.
+, where, `A` is the input tensor, `W` is the weight tensor, `b` is the batch index, `k` is the out channels, `i` and `j` are indices for image height and width, `di` and `dj` are the indices of the weight, `q` is the input channel, and `strides` is the stride of the filter window.
 
 In the exercise, we pick a small and simple case with `stride=1, padding=0`.
 
